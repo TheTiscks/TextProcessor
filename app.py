@@ -43,7 +43,7 @@ def process():
     
     # Вызов C-программы для подсчета слов
     c_result = subprocess.run(
-        ['./text_stats'], 
+        ['./text_stats.exe'], 
         input=text.encode(), 
         capture_output=True
     )
