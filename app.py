@@ -4,7 +4,32 @@ import subprocess
 app = Flask(__name__)
 
 HTML = '''
-html page n/a yet
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Текстовый процессор</title>
+    <script>
+    async function processText() {
+        const text = document.getElementById('text').value;
+        const response = await fetch('/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        const result = await response.json();
+        document.getElementById('output').innerHTML = `
+            Слов: ${result.words}<br>
+            Зашифровано: ${result.encrypted}
+        `;
+    }
+    </script>
+</head>
+<body>
+    <textarea id="text" rows="5"></textarea><br>
+    <button onclick="processText()">Анализ</button>
+    <div id="output"></div>
+</body>
+</html>
 '''
 
 
