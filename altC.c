@@ -1,16 +1,16 @@
 #include <stdio.h>
+#include <wchar.h>
+#include <locale.h>
 #include <string.h>
-#include <ctype.h>
 #include <stdlib.h>
-#include <windows.h> // Для SetConsoleCP
 
-int count_words(const char *text) {
+// Функция подсчета слов для широких символов
+int count_words(const wchar_t *text) {
     int words = 0;
     int in_word = 0;
     
-    for (size_t i = 0; text[i] != '\0'; i++) {
-        // Явно проверяем только пробел и табуляцию
-        if (text[i] == ' ' || text[i] == '\t') {
+    for (size_t i = 0; text[i] != L'\0'; i++) {
+        if (iswspace(text[i])) {
             if (in_word) {
                 words++;
                 in_word = 0;
@@ -24,65 +24,67 @@ int count_words(const char *text) {
     return words;
 }
 
-void reverse_string(char *str) {
-    size_t length = strlen(str);
+// Реверс строки широких символов
+void reverse_wide_string(wchar_t *str) {
+    size_t length = wcslen(str);
     for (size_t i = 0; i < length / 2; i++) {
-        char temp = str[i];
+        wchar_t temp = str[i];
         str[i] = str[length - i - 1];
         str[length - i - 1] = temp;
     }
 }
 
+// Меню
 void show_menu() {
-    printf("\n1. Анализ текста\n");
-    printf("2. Выход\n");
-    printf("Выберите действие: ");
+    wprintf(L"\n1. Анализ текста\n");
+    wprintf(L"2. Выход\n");
+    wprintf(L"Выберите действие: ");
 }
 
 int main() {
-    char text[1000];
-    int choice;
+    // Установка локали для поддержки Unicode
+    setlocale(LC_ALL, "");
     
-    // Настройка кодировки для Windows
-    SetConsoleCP(1251);
-    SetConsoleOutputCP(1251);
+    // Для Windows: дополнительная настройка консоли
+    #ifdef _WIN32
+    system("chcp 65001 > nul"); // UTF-8
+    #endif
+
+    wchar_t text[1000];
+    int choice;
     
     do {
         show_menu();
-        if(scanf("%d", &choice) != 1) {
-            while(getchar() != '\n'); // Очистка буфера
-            continue;
-        }
-        getchar(); // Очистка '\n'
+        wscanf(L"%d", &choice);
+        while(getwchar() != L'\n'); // Очистка буфера
         
         switch(choice) {
             case 1: {
-                printf("\nВведите текст (до 999 символов):\n");
-                fgets(text, sizeof(text), stdin);
-                text[strcspn(text, "\n")] = '\0';
+                wprintf(L"\nВведите текст (до 999 символов):\n");
+                fgetws(text, sizeof(text)/sizeof(wchar_t), stdin);
+                text[wcslen(text)-1] = L'\0'; // Удаление \n
                 
                 // Подсчет слов
                 int words = count_words(text);
                 
-                // Шифрование
-                char encrypted[1000];
-                strcpy(encrypted, text);
-                reverse_string(encrypted);
+                // Шифрование (реверс)
+                wchar_t encrypted[1000];
+                wcscpy(encrypted, text);
+                reverse_wide_string(encrypted);
                 
-                printf("\nРезультаты:\n");
-                printf("Слов: %d\n", words);
-                printf("Зашифровано: %s\n", encrypted);
+                // Вывод результатов
+                wprintf(L"\nРезультаты:\n");
+                wprintf(L"Слов: %d\n", words);
+                wprintf(L"Зашифровано: %ls\n", encrypted);
                 break;
             }
             case 2:
-                printf("Выход...\n");
+                wprintf(L"Выход...\n");
                 break;
             default:
-                printf("Неверный выбор!\n");
+                wprintf(L"Неверный выбор!\n");
         }
     } while(choice != 2);
     
     return 0;
 }
-
-// для работы с кириллицей комплировать как: gcc -fexec-charset=CP1251 altC.c -o altC.exe  
