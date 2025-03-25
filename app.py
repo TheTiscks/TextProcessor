@@ -53,47 +53,33 @@ def process():
     text = request.json.get('text', '')
     
     if not text:
-        return jsonify({
-            'error': 'Введите текст для анализа'
-        }), 400
+        return jsonify({'error': 'Введите текст для анализа'}), 400
     
     try:
-        # Вызов C-программы
-        print(f"[DEBUG] C-ввод: '{text}'")
-        c_result = subprocess.run(
-            ['./text_stats.exe'],
-            input=text,
+        # Получаем количество слов через Java
+        count_result = subprocess.run(
+            ['java', 'TextEncryptor', 'count', text],
             capture_output=True,
             text=True,
             check=True,
             timeout=5
         )
-        words = c_result.stdout.strip()
-        print(f"[DEBUG] C-результат: {words}")
-        
-        # Вызов Java-программы
-        print(f"[DEBUG] Java-ввод: '{text}'")
-        java_result = subprocess.run(
-            ['java', 'TextEncryptor', text],
+        words = count_result.stdout.strip()
+
+        # Получаем шифрованный текст через Java
+        encrypt_result = subprocess.run(
+            ['java', 'TextEncryptor', 'encrypt', text],
             capture_output=True,
             text=True,
             check=True,
             timeout=5
         )
-        encrypted = java_result.stdout.strip()
-        print(f"[DEBUG] Java-результат: {encrypted}")
-        
+        encrypted = encrypt_result.stdout.strip()
+
     except subprocess.CalledProcessError as e:
-        print(f"Subprocess error: {e.stderr}")
-        return jsonify({
-            'error': f"Ошибка обработки: {e.stderr}"
-        }), 500
-        
+        return jsonify({'error': f"Ошибка Java: {e.stderr}"}), 500
     except Exception as e:
-        print(f"General error: {str(e)}")
-        return jsonify({
-            'error': f"Неизвестная ошибка: {str(e)}"
-        }), 500
+        return jsonify({'error': f"Неизвестная ошибка: {str(e)}"}), 500
     
     return jsonify({
         'words': words,
