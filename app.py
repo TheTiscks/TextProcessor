@@ -52,13 +52,16 @@ def home():
 def process():
     text = request.json.get('text', '')
     
-    if not text:
+    if not text.strip():
         return jsonify({'error': 'Введите текст для анализа'}), 400
     
     try:
-        # Получаем количество слов через Java
+        import shlex
+        text_escaped = shlex.quote(text)
+        
+        # Подсчет слов
         count_result = subprocess.run(
-            ['java', 'TextEncryptor', 'count', text],
+            ['java', '-cp', '.', 'TextEncryptor', 'count', text_escaped],
             capture_output=True,
             text=True,
             check=True,
@@ -66,9 +69,9 @@ def process():
         )
         words = count_result.stdout.strip()
 
-        # Получаем шифрованный текст через Java
+        # Шифрование
         encrypt_result = subprocess.run(
-            ['java', 'TextEncryptor', 'encrypt', text],
+            ['java', '-cp', '.', 'TextEncryptor', 'encrypt', text_escaped],
             capture_output=True,
             text=True,
             check=True,
@@ -77,9 +80,14 @@ def process():
         encrypted = encrypt_result.stdout.strip()
 
     except subprocess.CalledProcessError as e:
-        return jsonify({'error': f"Ошибка Java: {e.stderr}"}), 500
+        return jsonify({
+            'error': f"Java Error: {e.stderr.decode('utf-8')}"
+        }), 500
+        
     except Exception as e:
-        return jsonify({'error': f"Неизвестная ошибка: {str(e)}"}), 500
+        return jsonify({
+            'error': f"Ошибка: {str(e)}"
+        }), 500
     
     return jsonify({
         'words': words,
