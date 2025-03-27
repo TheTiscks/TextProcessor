@@ -1,16 +1,15 @@
 public class TextEncryptor {
     public static void main(String[] args) {
-        if (args.length < 2) {
-            System.err.println("Ошибка: Недостаточно аргументов");
-            System.err.println("Использование: java TextEncryptor <режим> <текст>");
-            System.err.println("Режимы: count, encrypt");
-            System.exit(1); // код ошибки
-        }
-
-        String mode = args[0];
-        String text = args[1];
-
         try {
+            if (args.length < 2) {
+                System.err.println("Ошибка: Недостаточно аргументов");
+                System.err.println("Использование: java TextEncryptor <режим> <текст>");
+                System.exit(1);
+            }
+
+            String mode = args[0];
+            String text = args[1];
+
             switch (mode) {
                 case "count":
                     System.out.println(countWords(text));
@@ -19,11 +18,11 @@ public class TextEncryptor {
                     System.out.println(encrypt(text));
                     break;
                 default:
-                    System.err.println("Ошибка: Неизвестный режим '" + mode + "'");
+                    System.err.println("Неизвестный режим: " + mode);
                     System.exit(1);
             }
         } catch (Exception e) {
-            System.err.println("Ошибка обработки: " + e.getMessage());
+            System.err.println("Ошибка: " + e.getMessage());
             System.exit(1);
         }
     }

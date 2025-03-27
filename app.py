@@ -1,8 +1,6 @@
 from flask import Flask, request, jsonify
 import subprocess
 
-# Python 3.13   Flask 3.1.0
-
 app = Flask(__name__)
 
 HTML = '''
@@ -21,7 +19,7 @@ HTML = '''
             });
             
             if (!response.ok) {
-                throw new Error('Сервер вернул ошибку');
+                throw new Error('Сервер вернул ошибку: ' + (await response.text()));
             }
             
             const result = await response.json();
@@ -56,12 +54,9 @@ def process():
         return jsonify({'error': 'Введите текст для анализа'}), 400
     
     try:
-        import shlex
-        text_escaped = shlex.quote(text)
-        
-        # Подсчет слов
+        # Убираем shlex.quote и передаем текст напрямую
         count_result = subprocess.run(
-            ['java', '-cp', '.', 'TextEncryptor', 'count', text_escaped],
+            ['java', '-cp', '.', 'TextEncryptor', 'count', text],
             capture_output=True,
             text=True,
             check=True,
@@ -69,9 +64,8 @@ def process():
         )
         words = count_result.stdout.strip()
 
-        # Шифрование
         encrypt_result = subprocess.run(
-            ['java', '-cp', '.', 'TextEncryptor', 'encrypt', text_escaped],
+            ['java', '-cp', '.', 'TextEncryptor', 'encrypt', text],
             capture_output=True,
             text=True,
             check=True,
@@ -81,7 +75,7 @@ def process():
 
     except subprocess.CalledProcessError as e:
         return jsonify({
-            'error': f"Java Error: {e.stderr.decode('utf-8')}"
+            'error': f"Java Error: {e.stderr}"  # Убрали .decode()
         }), 500
         
     except Exception as e:
@@ -96,3 +90,4 @@ def process():
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
