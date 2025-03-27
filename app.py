@@ -81,7 +81,7 @@ def process():
 
     except subprocess.CalledProcessError as e:
         return jsonify({
-            'error': f"Java Error: {e.stderr}"  # .decode() not needed, stderr is str
+            'error': f"Java Error: {e.stderr.decode('utf-8')}"
         }), 500
         
     except Exception as e:
