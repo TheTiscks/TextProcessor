@@ -54,34 +54,36 @@ def process():
         return jsonify({'error': 'Введите текст для анализа'}), 400
     
     try:
-        # Убираем shlex.quote и передаем текст напрямую
+        # Путь к папке с .class-файлами (измените на свой!)
+        CLASS_PATH = "D:\\Source\\VSC TextProcessor\\TextProcessor"
+        
+        # Подсчет слов
         count_result = subprocess.run(
-            ['java', '-cp', '.', 'TextEncryptor', 'count', text],
+            ['java', '-cp', CLASS_PATH, 'TextEncryptor', 'count', text],
             capture_output=True,
             text=True,
             check=True,
-            timeout=5
+            timeout=5,
+            shell=True  # Важно для Windows!
         )
         words = count_result.stdout.strip()
 
+        # Шифрование
         encrypt_result = subprocess.run(
-            ['java', '-cp', '.', 'TextEncryptor', 'encrypt', text],
+            ['java', '-cp', CLASS_PATH, 'TextEncryptor', 'encrypt', text],
             capture_output=True,
             text=True,
             check=True,
-            timeout=5
+            timeout=5,
+            shell=True
         )
         encrypted = encrypt_result.stdout.strip()
 
     except subprocess.CalledProcessError as e:
-        return jsonify({
-            'error': f"Java Error: {e.stderr}"  # Убрали .decode()
-        }), 500
+        return jsonify({'error': f"Java Error: {e.stderr}"}), 500
         
     except Exception as e:
-        return jsonify({
-            'error': f"Ошибка: {str(e)}"
-        }), 500
+        return jsonify({'error': f"Ошибка: {str(e)}"}), 500
     
     return jsonify({
         'words': words,
