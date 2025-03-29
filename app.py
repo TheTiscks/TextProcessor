@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-import subprocess
 
 app = Flask(__name__)
 
@@ -42,6 +41,16 @@ HTML = '''
 </html>
 '''
 
+def count_words(text: str) -> int:
+    """Подсчет слов (аналог Java-функции)"""
+    if not text.strip():
+        return 0
+    return len(text.strip().split())
+
+def encrypt_text(text: str) -> str:
+    """Шифрование реверсом (аналог Java-функции)"""
+    return text[::-1]
+
 @app.route('/')
 def home():
     return HTML
@@ -54,42 +63,18 @@ def process():
         return jsonify({'error': 'Введите текст для анализа'}), 400
     
     try:
-        # Путь к папке с .class-файлами (измените на свой!)
-        CLASS_PATH = "D:\\Source\\VSC TextProcessor\\TextProcessor"
+        words = count_words(text)
+        encrypted = encrypt_text(text)
         
-        # Подсчет слов
-        count_result = subprocess.run(
-            ['java', '-cp', CLASS_PATH, 'TextEncryptor', 'count', text],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=5,
-            shell=True  # Важно для Windows!
-        )
-        words = count_result.stdout.strip()
-
-        # Шифрование
-        encrypt_result = subprocess.run(
-            ['java', '-cp', CLASS_PATH, 'TextEncryptor', 'encrypt', text],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=5,
-            shell=True
-        )
-        encrypted = encrypt_result.stdout.strip()
-
-    except subprocess.CalledProcessError as e:
-        return jsonify({'error': f"Java Error: {e.stderr}"}), 500
+        return jsonify({
+            'words': words,
+            'encrypted': encrypted
+        })
         
     except Exception as e:
-        return jsonify({'error': f"Ошибка: {str(e)}"}), 500
-    
-    return jsonify({
-        'words': words,
-        'encrypted': encrypted
-    })
+        return jsonify({
+            'error': f"Ошибка обработки: {str(e)}"
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
-    
