@@ -47,9 +47,11 @@ def count_words(text: str) -> int:
         return 0
     return len(text.strip().split())
 
+
 def encrypt_text(text: str) -> str:
     """Шифрование реверсом (аналог Java-функции)"""
     return text[::-1]
+
 
 @app.route('/')
 def home():
@@ -83,6 +85,7 @@ def favicon():
         'favicon.ico',
         mimetype='image/vnd.microsoft.icon'
     )
+
 
 if __name__ == '__main__':
     app.run(debug=True)
