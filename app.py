@@ -1,30 +1,52 @@
 from flask import Flask, request, jsonify, send_from_directory
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+from base64 import b64encode, b64decode
+import os
 
 app = Flask(__name__)
+
+# Конфигурация AES
+SECRET_KEY = os.urandom(16)  # 128-битный ключ
+IV = os.urandom(16)          # Вектор инициализации
 
 HTML = '''
 <!DOCTYPE html>
 <html>
 <head>
     <title>Текстовый процессор</title>
+    <link rel="icon" href="data:,">
     <script>
+    let mode = 'encrypt'; // По умолчанию шифрование
+
+    function toggleMode() {
+        mode = mode === 'encrypt' ? 'decrypt' : 'encrypt';
+        document.getElementById('modeBtn').textContent = 
+            mode === 'encrypt' ? 'Шифровать' : 'Дешифровать';
+        document.getElementById('output').innerHTML = '';
+    }
+
     async function processText() {
         const text = document.getElementById('text').value;
+        const key = document.getElementById('key').value;
+        
         try {
             const response = await fetch('/process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text })
+                body: JSON.stringify({ 
+                    text, 
+                    key,
+                    mode 
+                })
             });
             
-            if (!response.ok) {
-                throw new Error('Сервер вернул ошибку: ' + (await response.text()));
-            }
-            
             const result = await response.json();
+            if (!response.ok) throw new Error(result.error);
+            
             document.getElementById('output').innerHTML = `
-                Слов: ${result.words}<br>
-                Зашифровано: ${result.encrypted}
+                Режим: ${mode === 'encrypt' ? 'Шифрование' : 'Дешифровка'}<br>
+                Результат: ${result.text}
             `;
         } catch (error) {
             document.getElementById('output').innerHTML = 
@@ -34,24 +56,28 @@ HTML = '''
     </script>
 </head>
 <body>
-    <textarea id="text" rows="5"></textarea><br>
-    <button onclick="processText()">Анализ</button>
+    <textarea id="text" rows="5" placeholder="Введите текст..."></textarea><br>
+    <input type="text" id="key" placeholder="Ключ (16 символов)" style="width: 200px"><br>
+    <button id="modeBtn" onclick="toggleMode()">Шифровать</button>
+    <button onclick="processText()">Выполнить</button>
     <div id="output"></div>
 </body>
 </html>
 '''
 
 def count_words(text: str) -> int:
-    """Подсчет слов (аналог Java-функции)"""
-    if not text.strip():
-        return 0
-    return len(text.strip().split())
+    return len(text.strip().split()) if text.strip() else 0
 
+def aes_encrypt(text: str, key: bytes) -> str:
+    cipher = AES.new(key, AES.MODE_CBC, IV)
+    padded_text = pad(text.encode('utf-8'), AES.block_size)
+    cipher_text = cipher.encrypt(padded_text)
+    return b64encode(cipher_text).decode('utf-8')
 
-def encrypt_text(text: str) -> str:
-    """Шифрование реверсом (аналог Java-функции)"""
-    return text[::-1]
-
+def aes_decrypt(cipher_text: str, key: bytes) -> str:
+    cipher = AES.new(key, AES.MODE_CBC, IV)
+    decrypted = cipher.decrypt(b64decode(cipher_text))
+    return unpad(decrypted, AES.block_size).decode('utf-8')
 
 @app.route('/')
 def home():
@@ -59,33 +85,31 @@ def home():
 
 @app.route('/process', methods=['POST'])
 def process():
-    text = request.json.get('text', '')
-    
-    if not text.strip():
-        return jsonify({'error': 'Введите текст для анализа'}), 400
-    
+    data = request.json
+    text = data.get('text', '')
+    mode = data.get('mode', 'encrypt')
+    user_key = data.get('key', '').encode('utf-8')
+
     try:
-        words = count_words(text)
-        encrypted = encrypt_text(text)
-        
+        # Валидация ключа
+        if len(user_key) != 16:
+            raise ValueError("Ключ должен быть 16 байт (16 символов ASCII)")
+
+        if mode == 'encrypt':
+            processed = aes_encrypt(text, user_key)
+        elif mode == 'decrypt':
+            processed = aes_decrypt(text, user_key)
+        else:
+            raise ValueError("Неверный режим операции")
+
         return jsonify({
-            'words': words,
-            'encrypted': encrypted
+            'text': processed,
+            'words': count_words(text if mode == 'encrypt' else processed)
         })
-        
+
     except Exception as e:
-        return jsonify({
-            'error': f"Ошибка обработки: {str(e)}"
-        }), 500
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(
-        'static',
-        'favicon.ico',
-        mimetype='image/vnd.microsoft.icon'
-    )
-
+        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
