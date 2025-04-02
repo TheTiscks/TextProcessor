@@ -83,18 +83,17 @@ def aes_decrypt(cipher_text: str, key: bytes) -> str:
 def home():
     return HTML
 
-'''
 @app.route('/generate-key', methods=['GET'])
 def generate_key():
     # Генерация 256-битного ключа (32 байта) для AES-256
-    key = os.urandom(32)
-
-    # Возвращаем ключ в Base64 для удобства использования
+    key_bytes = os.urandom(32)
+    key_base64 = b64encode(key_bytes).decode('utf-8')
     return jsonify({
-        'key': b64encode(key).decode('utf-8'),
-        'length': len(key) * 8  # Длина в битах
+        'status': 'success',
+        'key': key_base64,
+        'bits': 256,
+        'description': 'AES-256 совместимый ключ'
     })
-'''
 
 @app.route('/process', methods=['POST'])
 def process():
@@ -104,24 +103,37 @@ def process():
     user_key = data.get('key', '').encode('utf-8')
 
     try:
-        # Валидация ключа
-        if len(user_key) != 16:
-            raise ValueError("Ключ должен быть 16 байт (16 символов ASCII)")
+        # Декодирование из Base64
+        try:
+            decoded_key = b64decode(user_key)
+        except:
+            raise ValueError("Неверный формат ключа. Используйте Base64")
 
+        # Проверка длины ключа (16, 24 или 32 байта)
+        if len(decoded_key) not in (16, 24, 32):
+            raise ValueError(
+                "Некорректная длина ключа. Допустимые размеры: "
+                "128 бит (16 символов), 192 бит (24) или 256 бит (32)"
+            )
         if mode == 'encrypt':
-            processed = aes_encrypt(text, user_key)
+            processed_text = aes_encrypt(text, decoded_key)
+            word_count = count_words(text)
         elif mode == 'decrypt':
-            processed = aes_decrypt(text, user_key)
+            processed_text = aes_decrypt(text, decoded_key)
+            word_count = count_words(processed_text)
         else:
             raise ValueError("Неверный режим операции")
-
         return jsonify({
-            'text': processed,
-            'words': count_words(text if mode == 'encrypt' else processed)
+            'status': 'success',
+            'text': processed_text,
+            'words': word_count,
+            'key_type': f"AES-{len(decoded_key) * 8}"
         })
-
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
