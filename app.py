@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory
 from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
+from Crypto.Util.Padding import pad, unpad      #pycryptodome package
 from base64 import b64encode, b64decode
 import os
 
@@ -82,6 +82,19 @@ def aes_decrypt(cipher_text: str, key: bytes) -> str:
 @app.route('/')
 def home():
     return HTML
+
+'''
+@app.route('/generate-key', methods=['GET'])
+def generate_key():
+    # Генерация 256-битного ключа (32 байта) для AES-256
+    key = os.urandom(32)
+
+    # Возвращаем ключ в Base64 для удобства использования
+    return jsonify({
+        'key': b64encode(key).decode('utf-8'),
+        'length': len(key) * 8  # Длина в битах
+    })
+'''
 
 @app.route('/process', methods=['POST'])
 def process():
