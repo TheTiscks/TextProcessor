@@ -4,6 +4,11 @@ from Crypto.Util.Padding import pad, unpad      #pycryptodome package
 from base64 import b64encode, b64decode
 import os
 
+import logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 app = Flask(__name__)
 
 # Конфигурация AES
@@ -27,6 +32,7 @@ HTML = '''
     }
 
     async function processText() {
+    
         const text = document.getElementById('text').value;
         const key = document.getElementById('key').value;
         
