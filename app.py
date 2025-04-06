@@ -35,7 +35,19 @@ HTML = '''
     
         const text = document.getElementById('text').value;
         const key = document.getElementById('key').value;
-        
+    
+        try {
+        // Валидация ключа
+            if (!key) throw new Error("Введите ключ");
+            if (!/^[A-Za-z0-9+/=]+$/.test(key)) {
+                throw new Error("Ключ должен быть в формате Base64");
+            }
+
+        // Валидация текста
+            if (!text) throw new Error("Введите текст");
+            if (mode === 'decrypt' && !/^[A-Za-z0-9+/=]+$/.test(text)) {
+                throw new Error("Для дешифровки нужен Base64");
+            }
         try {
             const response = await fetch('/process', {
                 method: 'POST',
@@ -55,9 +67,28 @@ HTML = '''
                 Результат: ${result.text}
             `;
         } catch (error) {
-            document.getElementById('output').innerHTML = 
-                'Ошибка: ' + error.message;
+            showError(error.message);
+            return;
         }
+    }
+    function showError(msg) {
+        document.getElementById('error').innerHTML = msg;
+        document.getElementById('error').style.color = 'red';
+    }
+    function generateKey() {
+        fetch('/generate-key')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('key').value = data.key;
+                document.getElementById('key-info').innerHTML = 
+                    `Ключ ${data.bits}-бит (${data.key.length} символов)`;
+        });
+    }
+
+    function copyKey() {
+        navigator.clipboard.writeText(
+            document.getElementById('key').value
+        );
     }
     </script>
 </head>
@@ -67,6 +98,13 @@ HTML = '''
     <button id="modeBtn" onclick="toggleMode()">Шифровать</button>
     <button onclick="processText()">Выполнить</button>
     <div id="output"></div>
+    <div id="error" style="margin: 10px 0"></div>
+    <div>
+    <button onclick="generateKey()">Сгенерировать</button>
+    <input type="text" id="key" placeholder="Ключ в Base64">
+    <button onclick="copyKey()">📋</button>
+    </div>
+<div id="key-info"></div>
 </body>
 </html>
 '''
@@ -103,10 +141,24 @@ def generate_key():
 
 @app.route('/process', methods=['POST'])
 def process():
-    data = request.json
-    text = data.get('text', '')
-    mode = data.get('mode', 'encrypt')
-    user_key = data.get('key', '').encode('utf-8')
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Неверный формат данных"}), 400
+
+    text = data.get('text', '').strip()
+    mode = data.get('mode', '')
+    key = data.get('key', '').strip()
+
+    # Детальная валидация
+    errors = []
+    if not text:
+        errors.append("Текст не может быть пустым")
+    if not key:
+        errors.append("Ключ не может быть пустым")
+    if mode not in ['encrypt', 'decrypt']:
+        errors.append("Неверный режим операции")
+    if errors:
+        return jsonify({"errors": errors}), 400
 
     try:
         # Декодирование из Base64
@@ -136,10 +188,11 @@ def process():
             'key_type': f"AES-{len(decoded_key) * 8}"
         })
     except Exception as e:
+        app.logger.error(f"Ошибка: {str(e)}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 400
+            "error": "Внутренняя ошибка сервера",
+            "details": str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
