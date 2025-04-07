@@ -42,7 +42,6 @@ HTML = '''
             if (!/^[A-Za-z0-9+/=]+$/.test(key)) {
                 throw new Error("Ключ должен быть в формате Base64");
             }
-
         // Валидация текста
             if (!text) throw new Error("Введите текст");
             if (mode === 'decrypt' && !/^[A-Za-z0-9+/=]+$/.test(text)) {
@@ -58,10 +57,8 @@ HTML = '''
                     mode 
                 })
             });
-            
             const result = await response.json();
             if (!response.ok) throw new Error(result.error);
-            
             document.getElementById('output').innerHTML = `
                 Режим: ${mode === 'encrypt' ? 'Шифрование' : 'Дешифровка'}<br>
                 Результат: ${result.text}
