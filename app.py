@@ -120,6 +120,9 @@ def aes_decrypt(cipher_text: str, key: bytes) -> str:
     decrypted = cipher.decrypt(b64decode(cipher_text))
     return unpad(decrypted, AES.block_size).decode('utf-8')
 
+@app.before_request
+def log_request():
+    app.logger.debug(f"Request: {request.method} {request.url}")
 @app.route('/')
 def home():
     return HTML
