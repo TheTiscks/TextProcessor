@@ -141,58 +141,46 @@ def generate_key():
 
 @app.route('/process', methods=['POST'])
 def process():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Неверный формат данных"}), 400
-
-    text = data.get('text', '').strip()
-    mode = data.get('mode', '')
-    key = data.get('key', '').strip()
-
-    # Детальная валидация
-    errors = []
-    if not text:
-        errors.append("Текст не может быть пустым")
-    if not key:
-        errors.append("Ключ не может быть пустым")
-    if mode not in ['encrypt', 'decrypt']:
-        errors.append("Неверный режим операции")
-    if errors:
-        return jsonify({"errors": errors}), 400
-
     try:
-        # Декодирование из Base64
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Требуется JSON-тело запроса"}), 400
+
+        text = data.get('text', '')
+        mode = data.get('mode', 'encrypt')
+        user_key = data.get('key', '')  # Ключ в Base64
+
+        if not user_key:
+            return jsonify({"error": "Ключ обязателен"}), 400
+
         try:
             decoded_key = b64decode(user_key)
         except:
-            raise ValueError("Неверный формат ключа. Используйте Base64")
+            return jsonify({"error": "Неверный формат ключа (требуется Base64)"}), 400
 
-        # Проверка длины ключа
-        if len(decoded_key) not in (16, 24, 32):
-            raise ValueError(
-                "Некорректная длина ключа. Допустимые размеры: "
-                "128 бит (16 символов), 192 бит (24) или 256 бит (32)"
-            )
+        # Режим шифрования
         if mode == 'encrypt':
-            processed_text = aes_encrypt(text, decoded_key)
-            word_count = count_words(text)
+            cipher = AES.new(decoded_key, AES.MODE_CBC, IV)
+            padded_text = pad(text.encode('utf-8'), AES.block_size)
+            encrypted = cipher.encrypt(padded_text)
+            result = b64encode(IV + encrypted).decode('utf-8')
+
+        # Режим дешифровки
         elif mode == 'decrypt':
-            processed_text = aes_decrypt(text, decoded_key)
-            word_count = count_words(processed_text)
+            encrypted_data = b64decode(text)
+            iv = encrypted_data[:16]
+            cipher_text = encrypted_data[16:]
+            cipher = AES.new(decoded_key, AES.MODE_CBC, iv)
+            decrypted = unpad(cipher.decrypt(cipher_text), AES.block_size)
+            result = decrypted.decode('utf-8')
+
         else:
-            raise ValueError("Неверный режим операции")
-        return jsonify({
-            'status': 'success',
-            'text': processed_text,
-            'words': word_count,
-            'key_type': f"AES-{len(decoded_key) * 8}"
-        })
+            return jsonify({"error": "Неверный режим (допустимо: encrypt/decrypt)"}), 400
+
+        return jsonify({"result": result})
+
     except Exception as e:
-        app.logger.error(f"Ошибка: {str(e)}")
-        return jsonify({
-            "error": "Внутренняя ошибка сервера",
-            "details": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
