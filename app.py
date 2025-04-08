@@ -1,187 +1,138 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad      #pycryptodome package
-from base64 import b64encode, b64decode
+from Crypto.Util.Padding import pad, unpad
+import base64
 import os
 
-import logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
 app = Flask(__name__)
 
-# Конфигурация AES
-SECRET_KEY = os.urandom(16)  # 128-битный ключ
-IV = os.urandom(16)          # Вектор инициализации
-
+# HTML-шаблон с улучшенным интерфейсом
 HTML = '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Текстовый процессор</title>
-    <link rel="icon" href="data:,">
-    <script>
-    let mode = 'encrypt'; // По умолчанию шифрование
-
-    function toggleMode() {
-        mode = mode === 'encrypt' ? 'decrypt' : 'encrypt';
-        document.getElementById('modeBtn').textContent = 
-            mode === 'encrypt' ? 'Шифровать' : 'Дешифровать';
-        document.getElementById('output').innerHTML = '';
-    }
-
-    async function processText() {
-    
-        const text = document.getElementById('text').value;
-        const key = document.getElementById('key').value;
-    
-        try {
-        // Валидация ключа
-            if (!key) throw new Error("Введите ключ");
-            if (!/^[A-Za-z0-9+/=]+$/.test(key)) {
-                throw new Error("Ключ должен быть в формате Base64");
-            }
-        // Валидация текста
-            if (!text) throw new Error("Введите текст");
-            if (mode === 'decrypt' && !/^[A-Za-z0-9+/=]+$/.test(text)) {
-                throw new Error("Для дешифровки нужен Base64");
-            }
-        try {
-            const response = await fetch('/process', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    text, 
-                    key,
-                    mode 
-                })
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error);
-            document.getElementById('output').innerHTML = `
-                Режим: ${mode === 'encrypt' ? 'Шифрование' : 'Дешифровка'}<br>
-                Результат: ${result.text}
-            `;
-        } catch (error) {
-            showError(error.message);
-            return;
-        }
-    }
-    function showError(msg) {
-        document.getElementById('error').innerHTML = msg;
-        document.getElementById('error').style.color = 'red';
-    }
-    function generateKey() {
-        fetch('/generate-key')
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('key').value = data.key;
-                document.getElementById('key-info').innerHTML = 
-                    `Ключ ${data.bits}-бит (${data.key.length} символов)`;
-        });
-    }
-
-    function copyKey() {
-        navigator.clipboard.writeText(
-            document.getElementById('key').value
-        );
-    }
-    </script>
+    <title>AES Cryptor</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
+        .container { border: 1px solid #ddd; padding: 20px; border-radius: 5px; }
+        input, textarea { width: 100%; margin: 5px 0; padding: 8px; }
+        button { background: #4CAF50; color: white; border: none; padding: 10px 20px; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .switch { display: flex; gap: 10px; margin: 10px 0; }
+    </style>
 </head>
 <body>
-    <textarea id="text" rows="5" placeholder="Введите текст..."></textarea><br>
-    <input type="text" id="key" placeholder="Ключ (16 символов)" style="width: 200px"><br>
-    <button id="modeBtn" onclick="toggleMode()">Шифровать</button>
-    <button onclick="processText()">Выполнить</button>
-    <div id="output"></div>
-    <div id="error" style="margin: 10px 0"></div>
-    <div>
-    <button onclick="generateKey()">Сгенерировать</button>
-    <input type="text" id="key" placeholder="Ключ в Base64">
-    <button onclick="copyKey()">📋</button>
+    <div class="container">
+        <h2>AES Encryptor/Decryptor</h2>
+        <div class="switch">
+            <button onclick="setMode('encrypt')" id="encryptBtn">Шифрование</button>
+            <button onclick="setMode('decrypt')" id="decryptBtn">Дешифровка</button>
+        </div>
+
+        <textarea id="text" rows="5" placeholder="Введите текст..."></textarea>
+        <input type="password" id="key" placeholder="Ключ (16/24/32 символа)">
+        <button onclick="process()" id="actionBtn">Шифровать</button>
+        <div id="result" style="margin-top: 10px; word-break: break-all;"></div>
     </div>
-<div id="key-info"></div>
+
+    <script>
+        let currentMode = 'encrypt';
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('actionBtn').textContent = 
+                mode === 'encrypt' ? 'Шифровать' : 'Дешифровать';
+            document.querySelectorAll('.switch button').forEach(btn => 
+                btn.style.background = btn.id === mode + 'Btn' ? '#45a049' : '#4CAF50');
+        }
+
+        async function process() {
+            const text = document.getElementById('text').value;
+            const key = document.getElementById('key').value;
+            const resultDiv = document.getElementById('result');
+
+            resultDiv.innerHTML = 'Обработка...';
+            resultDiv.style.color = 'black';
+
+            try {
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        text: text,
+                        key: key,
+                        mode: currentMode
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    resultDiv.style.color = 'red';
+                    resultDiv.innerHTML = 'Ошибка: ' + data.error;
+                } else {
+                    resultDiv.style.color = 'green';
+                    resultDiv.innerHTML = `Результат:<br>${data.result}`;
+                }
+            } catch (e) {
+                resultDiv.style.color = 'red';
+                resultDiv.innerHTML = 'Ошибка сети: ' + e.message;
+            }
+        }
+    </script>
 </body>
 </html>
 '''
 
-def count_words(text: str) -> int:
-    return len(text.strip().split()) if text.strip() else 0
 
-def aes_encrypt(text: str, key: bytes) -> str:
-    cipher = AES.new(key, AES.MODE_CBC, IV)
-    padded_text = pad(text.encode('utf-8'), AES.block_size)
-    cipher_text = cipher.encrypt(padded_text)
-    return b64encode(cipher_text).decode('utf-8')
+def encrypt_aes(plaintext, key):
+    iv = os.urandom(16)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    ct_bytes = cipher.encrypt(pad(plaintext.encode(), AES.block_size))
+    return base64.b64encode(iv + ct_bytes).decode()
 
-def aes_decrypt(cipher_text: str, key: bytes) -> str:
-    cipher = AES.new(key, AES.MODE_CBC, IV)
-    decrypted = cipher.decrypt(b64decode(cipher_text))
-    return unpad(decrypted, AES.block_size).decode('utf-8')
 
-@app.before_request
-def log_request():
-    app.logger.debug(f"Request: {request.method} {request.url}")
+def decrypt_aes(ciphertext, key):
+    data = base64.b64decode(ciphertext)
+    iv = data[:16]
+    ct = data[16:]
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    pt = unpad(cipher.decrypt(ct), AES.block_size)
+    return pt.decode()
+
+
 @app.route('/')
 def home():
     return HTML
 
-@app.route('/generate-key', methods=['GET'])
-def generate_key():
-    # Генерация 256-битного ключа (32 байта) для AES-256
-    key_bytes = os.urandom(32)
-    key_base64 = b64encode(key_bytes).decode('utf-8')
-    return jsonify({
-        'status': 'success',
-        'key': key_base64,
-        'bits': 256,
-        'description': 'AES-256 совместимый ключ'
-    })
 
 @app.route('/process', methods=['POST'])
 def process():
     try:
         data = request.get_json()
-        if not data:
-            return jsonify({"error": "Требуется JSON-тело запроса"}), 400
+        text = data['text']
+        key = data['key'].encode()
+        mode = data['mode']
 
-        text = data.get('text', '')
-        mode = data.get('mode', 'encrypt')
-        user_key = data.get('key', '')  # Ключ в Base64
+        # Валидация ключа
+        if len(key) not in (16, 24, 32):
+            return jsonify({'error': 'Некорректная длина ключа (16/24/32 символа)'}), 400
 
-        if not user_key:
-            return jsonify({"error": "Ключ обязателен"}), 400
-
-        try:
-            decoded_key = b64decode(user_key)
-        except:
-            return jsonify({"error": "Неверный формат ключа (требуется Base64)"}), 400
-
-        # Режим шифрования
+        # Обработка операции
         if mode == 'encrypt':
-            cipher = AES.new(decoded_key, AES.MODE_CBC, IV)
-            padded_text = pad(text.encode('utf-8'), AES.block_size)
-            encrypted = cipher.encrypt(padded_text)
-            result = b64encode(IV + encrypted).decode('utf-8')
-
-        # Режим дешифровки
+            result = encrypt_aes(text, key)
         elif mode == 'decrypt':
-            encrypted_data = b64decode(text)
-            iv = encrypted_data[:16]
-            cipher_text = encrypted_data[16:]
-            cipher = AES.new(decoded_key, AES.MODE_CBC, iv)
-            decrypted = unpad(cipher.decrypt(cipher_text), AES.block_size)
-            result = decrypted.decode('utf-8')
-
+            result = decrypt_aes(text, key)
         else:
-            return jsonify({"error": "Неверный режим (допустимо: encrypt/decrypt)"}), 400
+            return jsonify({'error': 'Неверный режим операции'}), 400
 
-        return jsonify({"result": result})
+        return jsonify({'result': result})
 
+    except ValueError as e:
+        return jsonify({'error': f'Ошибка обработки: {str(e)}'}), 400
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': f'Неизвестная ошибка: {str(e)}'}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
-    
