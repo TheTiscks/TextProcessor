@@ -1,17 +1,13 @@
-from flask import Flask, request, jsonify
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
-import base64
-import os
+from flask import Flask
 
 app = Flask(__name__)
 
-# HTML-шаблон с улучшенным интерфейсом
 HTML = '''
 <!DOCTYPE html>
 <html>
 <head>
     <title>AES Cryptor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
         .container { border: 1px solid #ddd; padding: 20px; border-radius: 5px; }
@@ -19,6 +15,8 @@ HTML = '''
         button { background: #4CAF50; color: white; border: none; padding: 10px 20px; cursor: pointer; }
         button:hover { background: #45a049; }
         .switch { display: flex; gap: 10px; margin: 10px 0; }
+        #result { margin-top: 10px; word-break: break-all; }
+        .error { color: red; }
     </style>
 </head>
 <body>
@@ -30,9 +28,9 @@ HTML = '''
         </div>
 
         <textarea id="text" rows="5" placeholder="Введите текст..."></textarea>
-        <input type="password" id="key" placeholder="Ключ (16/24/32 символа)">
+        <input type="password" id="key" placeholder="Ключ (любая длина)">
         <button onclick="process()" id="actionBtn">Шифровать</button>
-        <div id="result" style="margin-top: 10px; word-break: break-all;"></div>
+        <div id="result"></div>
     </div>
 
     <script>
@@ -40,44 +38,46 @@ HTML = '''
 
         function setMode(mode) {
             currentMode = mode;
-            document.getElementById('actionBtn').textContent = 
-                mode === 'encrypt' ? 'Шифровать' : 'Дешифровать';
-            document.querySelectorAll('.switch button').forEach(btn => 
-                btn.style.background = btn.id === mode + 'Btn' ? '#45a049' : '#4CAF50');
+            const btn = document.getElementById('actionBtn');
+            btn.textContent = mode === 'encrypt' ? 'Шифровать' : 'Дешифровать';
+            document.querySelectorAll('.switch button').forEach(b => 
+                b.style.background = b.id === mode + 'Btn' ? '#45a049' : '#4CAF50');
         }
 
-        async function process() {
+        function process() {
             const text = document.getElementById('text').value;
             const key = document.getElementById('key').value;
             const resultDiv = document.getElementById('result');
 
-            resultDiv.innerHTML = 'Обработка...';
-            resultDiv.style.color = 'black';
+            resultDiv.innerHTML = '';
+            resultDiv.className = '';
+
+            if (!text || !key) {
+                showError('Заполните все поля!');
+                return;
+            }
 
             try {
-                const response = await fetch('/process', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        text: text,
-                        key: key,
-                        mode: currentMode
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.error) {
-                    resultDiv.style.color = 'red';
-                    resultDiv.innerHTML = 'Ошибка: ' + data.error;
+                let result;
+                if (currentMode === 'encrypt') {
+                    result = CryptoJS.AES.encrypt(text, key).toString();
+                    resultDiv.innerHTML = `<strong>Зашифровано:</strong><br>${result}`;
                 } else {
-                    resultDiv.style.color = 'green';
-                    resultDiv.innerHTML = `Результат:<br>${data.result}`;
+                    const bytes = CryptoJS.AES.decrypt(text, key);
+                    result = bytes.toString(CryptoJS.enc.Utf8);
+                    if (!result) throw new Error('Неверный ключ или данные');
+                    resultDiv.innerHTML = `<strong>Дешифровано:</strong><br>${result}`;
                 }
+                resultDiv.style.color = 'green';
             } catch (e) {
-                resultDiv.style.color = 'red';
-                resultDiv.innerHTML = 'Ошибка сети: ' + e.message;
+                showError('Ошибка: ' + e.message);
             }
+        }
+
+        function showError(msg) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = msg;
+            resultDiv.className = 'error';
         }
     </script>
 </body>
@@ -85,53 +85,9 @@ HTML = '''
 '''
 
 
-def encrypt_aes(plaintext, key):
-    iv = os.urandom(16)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    ct_bytes = cipher.encrypt(pad(plaintext.encode(), AES.block_size))
-    return base64.b64encode(iv + ct_bytes).decode()
-
-
-def decrypt_aes(ciphertext, key):
-    data = base64.b64decode(ciphertext)
-    iv = data[:16]
-    ct = data[16:]
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    pt = unpad(cipher.decrypt(ct), AES.block_size)
-    return pt.decode()
-
-
 @app.route('/')
 def home():
     return HTML
-
-
-@app.route('/process', methods=['POST'])
-def process():
-    try:
-        data = request.get_json()
-        text = data['text']
-        key = data['key'].encode()
-        mode = data['mode']
-
-        # Валидация ключа
-        if len(key) not in (16, 24, 32):
-            return jsonify({'error': 'Некорректная длина ключа (16/24/32 символа)'}), 400
-
-        # Обработка операции
-        if mode == 'encrypt':
-            result = encrypt_aes(text, key)
-        elif mode == 'decrypt':
-            result = decrypt_aes(text, key)
-        else:
-            return jsonify({'error': 'Неверный режим операции'}), 400
-
-        return jsonify({'result': result})
-
-    except ValueError as e:
-        return jsonify({'error': f'Ошибка обработки: {str(e)}'}), 400
-    except Exception as e:
-        return jsonify({'error': f'Неизвестная ошибка: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
