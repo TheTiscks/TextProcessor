@@ -14,7 +14,7 @@ HTML = '''
     <style>
         body { 
             font-family: 'Arial', sans-serif; 
-            max-width: 600px; 
+            max-width: 700px; 
             margin: 2rem auto; 
             padding: 0 1rem;
             background: #f0f2f5;
@@ -35,7 +35,7 @@ HTML = '''
             gap: 0.5rem;
         }
         textarea, input, select {
-            width: 100%;
+            width: 95%;
             margin: 0.8rem 0;
             padding: 1rem;
             border: 2px solid #e0e0e0;
