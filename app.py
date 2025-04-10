@@ -9,6 +9,14 @@ from email.mime.text import MIMEText
 app = Flask(__name__)
 messages_db = {}
 
+SMTP_CONFIG = {
+    'server': 'smtp.yandex.ru',
+    'port': 587,
+    'username': 'your_email@yandex.ru',
+    'password': 'your_password',
+    'from_email': 'noreply@securecryptor.com'
+}
+
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(
@@ -332,42 +340,44 @@ def view_message(msg_id):
 
 def send_notification(msg_id):
     entry = messages_db.get(msg_id)
-    if not entry: return
+    if not entry:
+        return
 
-    # Для Email (нужен SMTP-сервер)
+    # Email уведомление
     if entry.get('notify_email'):
-        # Пример с использованием smtplib
-        import smtplib
-        from email.mime.text import MIMEText
-
-        msg = MIMEText(f"Сообщение {url_for('view_message', msg_id=msg_id, _external=True)} было просмотрено")
-        msg['Subject'] = '🔔 Уведомление SecureCryptor'
-        msg['From'] = 'noreply@securecryptor.com'
-        msg['To'] = entry['notify_email']
-
         try:
-            with smtplib.SMTP('smtp.example.com', 587) as server:
-                server.login('user', 'password')
+            msg = MIMEText(f"Сообщение {url_for('view_message', msg_id=msg_id, _external=True)} было просмотрено")
+            msg['Subject'] = '🔔 SecureCryptor: Сообщение просмотрено'
+            msg['From'] = SMTP_CONFIG['from_email']
+            msg['To'] = entry['notify_email']
+
+            with smtplib.SMTP(SMTP_CONFIG['server'], SMTP_CONFIG['port']) as server:
+                server.starttls()  # Включаем шифрование
+                server.login(SMTP_CONFIG['username'], SMTP_CONFIG['password'])
                 server.sendmail(msg['From'], [msg['To']], msg.as_string())
         except Exception as e:
-            print(f"Email error: {e}")
+            print(f"Ошибка отправки email: {e}")
 
-    # Для Webhook
+    # Webhook уведомление
     if entry.get('notify_webhook'):
         try:
             requests.post(
                 entry['notify_webhook'],
-                json={'event': 'message_viewed', 'msg_id': msg_id}
+                json={'event': 'message_viewed', 'msg_id': msg_id},
+                timeout=5
             )
         except Exception as e:
-            print(f"Webhook error: {e}")
+            print(f"Ошибка webhook: {e}")
 
 @app.route('/consume/<msg_id>')
 def consume_message(msg_id):
     if msg_id in messages_db:
-        messages_db[msg_id]['views_left'] -= 1
-        if messages_db[msg_id]['views_left'] <= 0:
-            send_notification(msg_id)  # Отправляем уведомление
+        try:
+            if messages_db[msg_id]['views_left'] <= 1:
+                send_notification(msg_id)
+        except Exception as e:
+            print(f"Notification error: {e}")
+        finally:
             del messages_db[msg_id]
     return '', 200
 
