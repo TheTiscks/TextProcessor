@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from datetime import datetime, timedelta
 import secrets
+import requests
 import os
 
 app = Flask(__name__)
@@ -128,6 +129,8 @@ HTML = '''
 
         <textarea id="text" rows="5" placeholder="✏️ Введите текст..."></textarea>
         <input type="password" id="key" placeholder="🔑 Ключ (любая длина)">
+        <input type="email" id="notifyEmail" placeholder="📧 Email для уведомления (опционально)">
+        <input type="url" id="notifyWebhook" placeholder="🌐 Webhook URL (опционально)">
 
         <div class="lifetime-selector" id="lifetimeSection">
             <select id="lifetime">
@@ -211,7 +214,9 @@ HTML = '''
             const key = document.getElementById('key').value;
             const lifetime = document.getElementById('lifetime').value;
             const linkResult = document.getElementById('linkResult');
-
+            const notifyEmail = document.getElementById('notifyEmail').value;
+            const notifyWebhook = document.getElementById('notifyWebhook').value;
+            
             if (!text || !key) {
                 showError('❗ Заполните текст и ключ!');
                 return;
@@ -222,8 +227,13 @@ HTML = '''
                 const response = await fetch('/create', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({encrypted_msg: encrypted, lifetime: lifetime})
-                });
+                    body: JSON.stringify({
+                        encrypted_msg: encrypted,
+                        lifetime: lifetime,
+                        notify_email: notifyEmail,  // Новые поля
+                        notify_webhook: notifyWebhook
+                    })
+                };
 
                 const data = await response.json();
                 if (data.url) {
@@ -266,7 +276,9 @@ def create_message():
     messages_db[msg_id] = {
         'encrypted': data['encrypted_msg'],
         'expires': datetime.now() + lifetimes[data['lifetime']],
-        'views_left': 1
+        'views_left': 1,
+        'notify_email': data.get('notify_email'),
+        'notify_webhook': data.get('notify_webhook')
     }
 
     return jsonify({'url': f'http://localhost:5000/m/{msg_id}'})
@@ -316,11 +328,44 @@ def view_message(msg_id):
     '''
 
 
+def send_notification(msg_id):
+    entry = messages_db.get(msg_id)
+    if not entry: return
+
+    # Для Email (нужен SMTP-сервер)
+    if entry.get('notify_email'):
+        # Пример с использованием smtplib
+        import smtplib
+        from email.mime.text import MIMEText
+
+        msg = MIMEText(f"Сообщение {url_for('view_message', msg_id=msg_id, _external=True)} было просмотрено")
+        msg['Subject'] = '🔔 Уведомление SecureCryptor'
+        msg['From'] = 'noreply@securecryptor.com'
+        msg['To'] = entry['notify_email']
+
+        try:
+            with smtplib.SMTP('smtp.example.com', 587) as server:
+                server.login('user', 'password')
+                server.sendmail(msg['From'], [msg['To']], msg.as_string())
+        except Exception as e:
+            print(f"Email error: {e}")
+
+    # Для Webhook
+    if entry.get('notify_webhook'):
+        try:
+            requests.post(
+                entry['notify_webhook'],
+                json={'event': 'message_viewed', 'msg_id': msg_id}
+            )
+        except Exception as e:
+            print(f"Webhook error: {e}")
+
 @app.route('/consume/<msg_id>')
 def consume_message(msg_id):
     if msg_id in messages_db:
         messages_db[msg_id]['views_left'] -= 1
         if messages_db[msg_id]['views_left'] <= 0:
+            send_notification(msg_id)  # Отправляем уведомление
             del messages_db[msg_id]
     return '', 200
 
