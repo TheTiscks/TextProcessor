@@ -1,8 +1,10 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, url_for
 from datetime import datetime, timedelta
 import secrets
 import requests
 import os
+import smtplib
+from email.mime.text import MIMEText
 
 app = Flask(__name__)
 messages_db = {}
