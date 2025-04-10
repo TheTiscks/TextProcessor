@@ -233,7 +233,7 @@ HTML = '''
                         notify_email: notifyEmail,  // Новые поля
                         notify_webhook: notifyWebhook
                     })
-                };
+                });
 
                 const data = await response.json();
                 if (data.url) {
