@@ -10,11 +10,11 @@ app = Flask(__name__)
 messages_db = {}
 
 SMTP_CONFIG = {
-    'server': 'smtp.yandex.ru',
-    'port': 587,
-    'username': 'your_email@yandex.ru',
+    'server': 'smtp.elasticemail.com',
+    'port': 2525,
+    'username': 'tiscks@mail.ru',
     'password': 'your_password',
-    'from_email': 'noreply@securecryptor.com'
+    'from_email': 'noreply@tisckstext.com'
 }
 
 @app.route('/favicon.ico')
