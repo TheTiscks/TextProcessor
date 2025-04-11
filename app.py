@@ -13,7 +13,7 @@ SMTP_CONFIG = {
     'server': 'smtp.elasticemail.com',
     'port': 2525,
     'username': 'tiscks@mail.ru',
-    'password': 'your_password',
+    'password': '',
     'from_email': 'noreply@tisckstext.com'
 }
 
@@ -346,17 +346,20 @@ def send_notification(msg_id):
     # Email уведомление
     if entry.get('notify_email'):
         try:
+            print(f"[DEBUG] Попытка отправки email на {entry['notify_email']}")
             msg = MIMEText(f"Сообщение {url_for('view_message', msg_id=msg_id, _external=True)} было просмотрено")
-            msg['Subject'] = '🔔 SecureCryptor: Сообщение просмотрено'
+            msg['Subject'] = 'SecureCryptor: Сообщение просмотрено'
             msg['From'] = SMTP_CONFIG['from_email']
             msg['To'] = entry['notify_email']
 
             with smtplib.SMTP(SMTP_CONFIG['server'], SMTP_CONFIG['port']) as server:
-                server.starttls()  # Включаем шифрование
+                server.starttls()  # Обязательно для порта 2525
                 server.login(SMTP_CONFIG['username'], SMTP_CONFIG['password'])
                 server.sendmail(msg['From'], [msg['To']], msg.as_string())
+                print("[DEBUG] Email отправлен успешно!")
+
         except Exception as e:
-            print(f"Ошибка отправки email: {e}")
+            print(f"[ERROR] Ошибка отправки email: {str(e)}")
 
     # Webhook уведомление
     if entry.get('notify_webhook'):
