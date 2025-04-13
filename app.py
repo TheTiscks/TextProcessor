@@ -15,7 +15,8 @@ SMTP_CONFIG = {
     'username': 'tiscks@mail.ru',
     'password': '',
     'from_email': 'noreply@tisckstext.com'
-}
+} # config for SMTP
+# not wirking atm
 
 @app.route('/favicon.ico')
 def favicon():
