@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify, send_from_directory, url_for
 from datetime import datetime, timedelta
+from email.mime.text import MIMEText
 import secrets
 import requests
 import os
 import smtplib
-from email.mime.text import MIMEText
+
 
 app = Flask(__name__)
 messages_db = {}
@@ -277,13 +278,11 @@ HTML = '''
 def create_message():
     data = request.json
     msg_id = secrets.token_urlsafe(16)
-
     lifetimes = {
         'hour': timedelta(hours=1),
         'day': timedelta(days=1),
         'week': timedelta(weeks=1)
     }
-
     messages_db[msg_id] = {
         'encrypted': data['encrypted_msg'],
         'expires': datetime.now() + lifetimes[data['lifetime']],
@@ -291,14 +290,12 @@ def create_message():
         'notify_email': data.get('notify_email'),
         'notify_webhook': data.get('notify_webhook')
     }
-
     return jsonify({'url': f'http://localhost:5000/m/{msg_id}'})
 
 
 @app.route('/m/<msg_id>')
 def view_message(msg_id):
     entry = messages_db.get(msg_id)
-
     if not entry or datetime.now() > entry['expires']:
         if msg_id in messages_db: del messages_db[msg_id]
         return '''
@@ -307,7 +304,6 @@ def view_message(msg_id):
                 <p>Это сообщение было автоматически удалено</p>
             </div>
         '''
-
     return f'''
         <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
         <div style="max-width: 600px; margin: 4rem auto; padding: 2rem; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
@@ -316,11 +312,9 @@ def view_message(msg_id):
             <script>
                 const encrypted = "{entry['encrypted']}";
                 const key = prompt('🔑 Введите ключ для расшифровки:');
-
                 try {{
                     const bytes = CryptoJS.AES.decrypt(encrypted, key);
                     const text = bytes.toString(CryptoJS.enc.Utf8);
-
                     if (text) {{
                         document.getElementById('content').innerHTML = `
                             <div style="color: #2e7d32; font-size: 1.1rem;">${{text}}</div>
@@ -343,7 +337,6 @@ def send_notification(msg_id):
     entry = messages_db.get(msg_id)
     if not entry:
         return
-
     # Email уведомление
     if entry.get('notify_email'):
         try:
@@ -352,16 +345,13 @@ def send_notification(msg_id):
             msg['Subject'] = 'SecureCryptor: Сообщение просмотрено'
             msg['From'] = SMTP_CONFIG['from_email']
             msg['To'] = entry['notify_email']
-
             with smtplib.SMTP(SMTP_CONFIG['server'], SMTP_CONFIG['port']) as server:
                 server.starttls()  # Обязательно для порта 2525
                 server.login(SMTP_CONFIG['username'], SMTP_CONFIG['password'])
                 server.sendmail(msg['From'], [msg['To']], msg.as_string())
                 print("[DEBUG] Email отправлен успешно!")
-
         except Exception as e:
             print(f"[ERROR] Ошибка отправки email: {str(e)}")
-
     # Webhook уведомление
     if entry.get('notify_webhook'):
         try:
@@ -393,3 +383,4 @@ def home():
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
