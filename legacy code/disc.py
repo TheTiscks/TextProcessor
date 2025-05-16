@@ -10,37 +10,40 @@ class Graph:
 
 def read_graph_from_file(filename):
     graph = Graph()
-    with open(filename, 'r') as file:
-        # Чтение количества вершин и игнорирование второго числа (для двудольных графов)
-        line = file.readline().strip().split()
-        graph.V = int(line[0])
+    try:
+        with open(filename, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+            # Чтение количества вершин (первое число в первой строке)
+            graph.V = int(lines[0].strip().split()[0])
 
-        # Чтение матрицы смежности
-        graph.matrix = []
-        for _ in range(graph.V):
-            row = list(map(int, file.readline().strip().split()))
-            graph.matrix.append(row)
+            # Чтение матрицы смежности
+            graph.matrix = []
+            for i in range(1, graph.V + 1):
+                row = list(map(int, lines[i].strip().split()))
+                graph.matrix.append(row)
 
-        # Проверка на ориентированность
-        graph.is_directed = False
-        for i in range(graph.V):
-            for j in range(graph.V):
-                if graph.matrix[i][j] != graph.matrix[j][i]:
-                    graph.is_directed = True
+            # Проверка на ориентированность
+            graph.is_directed = False
+            for i in range(graph.V):
+                for j in range(graph.V):
+                    if graph.matrix[i][j] != graph.matrix[j][i]:
+                        graph.is_directed = True
+                        break
+                if graph.is_directed:
                     break
-            if graph.is_directed:
-                break
+    except Exception as e:
+        print(f"Ошибка чтения файла: {e}")
+        sys.exit(1)
     return graph
 
 
 def find_cycles(graph):
     visited = [False] * graph.V
     parent = [-1] * graph.V
-    depth = [0] * graph.V
     cycles = []
 
     def dfs(u):
-        nonlocal visited, parent, depth, cycles
+        nonlocal visited, parent, cycles
         visited[u] = True
         for v in range(graph.V):
             if graph.matrix[u][v] == 0:
@@ -48,12 +51,11 @@ def find_cycles(graph):
 
             if not visited[v]:
                 parent[v] = u
-                depth[v] = depth[u] + 1
                 dfs(v)
-            elif v != parent[u] and depth[v] < depth[u]:
-                # Обнаружено обратное ребро, формируем цикл
-                current = u
+            elif v != parent[u]:
+                # Обнаружен цикл
                 cycle = []
+                current = u
                 while current != v:
                     cycle.append(current)
                     current = parent[current]
@@ -68,31 +70,34 @@ def find_cycles(graph):
 
 
 def save_result(filename, graph, cycles):
-    with open(filename, 'w', encoding='utf-8') as file:
-        # Сохранение базовой структуры графа
-        file.write(f"{graph.V} 0\n")
-        for row in graph.matrix:
-            file.write(" ".join(map(str, row)) + "\n")
+    try:
+        with open(filename, 'w', encoding='utf-8') as file:
+            # Запись базовой структуры графа
+            file.write(f"{graph.V} 0\n")
+            for row in graph.matrix:
+                file.write(" ".join(map(str, row)) + "\n")
 
-        # Секция для вывода в консоль Графоида
-        file.write("<Text>\n")
-        file.write("=== Результат поиска циклов ===\n")
-        file.write(f"Всего найдено циклов: {len(cycles)}\n")
+            # Секция для вывода в консоль Графоида
+            file.write("<Text>\n")
+            file.write("=== Результаты анализа ===\n")
+            file.write(f"Найдено циклов: {len(cycles)}\n\n")
 
-        for i, cycle in enumerate(cycles, 1):
-            # Форматирование цикла: вершины через стрелки
-            cycle_str = " → ".join(map(str, cycle))
-            file.write(f"Цикл #{i}: {cycle_str}\n")
+            for i, cycle in enumerate(cycles, 1):
+                cycle_str = " → ".join(map(str, cycle))
+                file.write(f"Цикл {i}: {cycle_str}\n")
 
-        # Дополнительная информация
-        file.write("\nСправка:\n")
-        file.write("- Циклы выводятся в порядке их обнаружения\n")
-        file.write("- Вершины перечислены в порядке обхода\n")
+            # Пример добавления цвета (если требуется)
+            file.write("\n<Vertex_Colors>\n")
+            file.write("0 green\n")  # Пример окрашивания вершины 0 в зеленый
+
+    except Exception as e:
+        print(f"Ошибка сохранения файла: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Использование: python cycle_base.py <input_file>")
+        print("Использование: python cycle_finder.py <input_file>")
         sys.exit(1)
 
     input_file = sys.argv[1]
@@ -100,4 +105,4 @@ if __name__ == "__main__":
     cycles = find_cycles(graph)
     save_result("output.txt", graph, cycles)
 
-    print("Обработка завершена. Результат сохранен в output.txt")
+    print("Обработка завершена. Файл 'output.txt' создан.")
