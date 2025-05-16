@@ -68,17 +68,26 @@ def find_cycles(graph):
 
 
 def save_result(filename, graph, cycles):
-    with open(filename, 'w') as file:
+    with open(filename, 'w', encoding='utf-8') as file:
         # Сохранение базовой структуры графа
         file.write(f"{graph.V} 0\n")
         for row in graph.matrix:
             file.write(" ".join(map(str, row)) + "\n")
 
-        # Запись циклов в секцию <Text>
+        # Секция для вывода в консоль Графоида
         file.write("<Text>\n")
-        file.write(f"Найдено циклов: {len(cycles)}\n")
-        for i, cycle in enumerate(cycles):
-            file.write(f"Цикл {i + 1}: {' '.join(map(str, cycle))}\n")
+        file.write("=== Результат поиска циклов ===\n")
+        file.write(f"Всего найдено циклов: {len(cycles)}\n")
+
+        for i, cycle in enumerate(cycles, 1):
+            # Форматирование цикла: вершины через стрелки
+            cycle_str = " → ".join(map(str, cycle))
+            file.write(f"Цикл #{i}: {cycle_str}\n")
+
+        # Дополнительная информация
+        file.write("\nСправка:\n")
+        file.write("- Циклы выводятся в порядке их обнаружения\n")
+        file.write("- Вершины перечислены в порядке обхода\n")
 
 
 if __name__ == "__main__":
