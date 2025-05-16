@@ -1,108 +1,79 @@
 import sys
 
 
-class Graph:
-    def __init__(self):
-        self.V = 0
-        self.matrix = []
-        self.is_directed = False
+def read_graph(input_file):
+    with open(input_file, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+        size = int(lines[0].strip().split()[0])
+        matrix = []
+        for i in range(1, size + 1):
+            row = list(map(int, lines[i].strip().split()))
+            matrix.append(row)
+    return matrix, size
 
 
-def read_graph_from_file(filename):
-    graph = Graph()
-    try:
-        with open(filename, 'r', encoding='utf-8') as file:
-            lines = file.readlines()
-            # Чтение количества вершин (первое число в первой строке)
-            graph.V = int(lines[0].strip().split()[0])
+def dfs(u, graph, visited, parent, cycles, depth):
+    visited[u] = True
+    for v in range(len(graph)):
+        if graph[u][v] == 0:
+            continue
 
-            # Чтение матрицы смежности
-            graph.matrix = []
-            for i in range(1, graph.V + 1):
-                row = list(map(int, lines[i].strip().split()))
-                graph.matrix.append(row)
-
-            # Проверка на ориентированность
-            graph.is_directed = False
-            for i in range(graph.V):
-                for j in range(graph.V):
-                    if graph.matrix[i][j] != graph.matrix[j][i]:
-                        graph.is_directed = True
-                        break
-                if graph.is_directed:
-                    break
-    except Exception as e:
-        print(f"Ошибка чтения файла: {e}")
-        sys.exit(1)
-    return graph
+        if not visited[v]:
+            parent[v] = u
+            depth[v] = depth[u] + 1
+            dfs(v, graph, visited, parent, cycles, depth)
+        elif v != parent[u] and depth[v] < depth[u]:
+            # Обнаружен цикл
+            cycle = []
+            current = u
+            while current != v:
+                cycle.append(current)
+                current = parent[current]
+            cycle.extend([v, u])  # Замыкаем цикл
+            cycles.append(cycle)
 
 
-def find_cycles(graph):
-    visited = [False] * graph.V
-    parent = [-1] * graph.V
+def find_cycles(graph, size):
+    visited = [False] * size
+    parent = [-1] * size
+    depth = [0] * size
     cycles = []
 
-    def dfs(u):
-        nonlocal visited, parent, cycles
-        visited[u] = True
-        for v in range(graph.V):
-            if graph.matrix[u][v] == 0:
-                continue
-
-            if not visited[v]:
-                parent[v] = u
-                dfs(v)
-            elif v != parent[u]:
-                # Обнаружен цикл
-                cycle = []
-                current = u
-                while current != v:
-                    cycle.append(current)
-                    current = parent[current]
-                cycle.extend([v, u])  # Замыкаем цикл
-                cycles.append(cycle)
-
-    for i in range(graph.V):
+    for i in range(size):
         if not visited[i]:
-            dfs(i)
+            dfs(i, graph, visited, parent, cycles, depth)
 
-    return cycles
+    # Удаление дубликатов
+    unique_cycles = []
+    for cycle in cycles:
+        normalized = sorted(cycle[:-1])  # Игнорируем последний элемент (дублирует первый)
+        if normalized not in [sorted(c[:-1]) for c in unique_cycles]:
+            unique_cycles.append(cycle)
 
-
-def save_result(filename, graph, cycles):
-    try:
-        with open(filename, 'w', encoding='utf-8') as file:
-            # Запись базовой структуры графа
-            file.write(f"{graph.V} 0\n")
-            for row in graph.matrix:
-                file.write(" ".join(map(str, row)) + "\n")
-
-            # Секция для вывода в консоль Графоида
-            file.write("<Text>\n")
-            file.write("=== Результаты анализа ===\n")
-            file.write(f"Найдено циклов: {len(cycles)}\n\n")
-
-            for i, cycle in enumerate(cycles, 1):
-                cycle_str = " → ".join(map(str, cycle))
-                file.write(f"Цикл {i}: {cycle_str}\n")
-
-            # Пример добавления цвета (если требуется)
-            file.write("\n<Vertex_Colors>\n")
-            file.write("0 green\n")  # Пример окрашивания вершины 0 в зеленый
-
-    except Exception as e:
-        print(f"Ошибка сохранения файла: {e}")
-        sys.exit(1)
+    return unique_cycles
 
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Использование: python cycle_finder.py <input_file>")
-        sys.exit(1)
+def save_result(input_file, matrix, cycles):
+    with open(input_file, 'w', encoding='utf-8') as f:
+        # Сохраняем исходные данные
+        f.write(f"{len(matrix)} 0\n")
+        for row in matrix:
+            f.write(' '.join(map(str, row)) + '\n')
 
-    input_file = sys.argv[1]
-    graph = read_graph_from_file(input_file)
-    cycles = find_cycles(graph)
-    save_result("output.txt", graph, cycles)
+        # Запись результатов
+        f.write("<Text>\n")
+        f.write(f"Найдено циклов: {len(cycles)}\n")
+        for i, cycle in enumerate(cycles, 1):
+            cycle_str = " → ".join(map(str, cycle))
+            f.write(f"Цикл {i}: {cycle_str}\n")
 
-    print("Обработка завершена. Файл 'output.txt' создан.")
+
+def main(input_file):
+    graph, size = read_graph(input_file)
+    cycles = find_cycles(graph, size)
+    save_result(input_file, graph, cycles)
+
+
+if __name__ == '__main__':
+    if len(sys.argv) == 2:
+        main(sys.argv[1])
