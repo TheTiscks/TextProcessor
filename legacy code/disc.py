@@ -23,13 +23,12 @@ def dfs(u, graph, visited, parent, cycles, depth):
             depth[v] = depth[u] + 1
             dfs(v, graph, visited, parent, cycles, depth)
         elif v != parent[u] and depth[v] < depth[u]:
-            # Проверка наличия рёбер между всеми вершинами цикла
+            # Проверка наличия всех рёбер в цикле
             cycle = []
             current = u
             valid = True
             path = [current]
 
-            # Собираем вершины цикла
             while current != v:
                 next_node = parent[current]
                 if graph[current][next_node] == 0:
@@ -38,11 +37,14 @@ def dfs(u, graph, visited, parent, cycles, depth):
                 path.append(next_node)
                 current = next_node
 
-            if valid:
-                # Проверяем наличие ребра между последней и первой вершиной
-                if graph[path[-1]][u] == 1:
-                    cycle = path + [u]
-                    cycles.append(cycle)
+            if valid and graph[path[-1]][u] == 1:
+                cycle = path + [u]
+                # Нормализация цикла для неориентированного графа
+                min_vertex = min(cycle[:-1])
+                idx = cycle.index(min_vertex)
+                normalized = cycle[idx:-1] + cycle[:idx] + [min_vertex]
+                if normalized not in cycles:
+                    cycles.append(normalized)
 
 
 def find_cycles(graph, size):
@@ -55,27 +57,15 @@ def find_cycles(graph, size):
         if not visited[i]:
             dfs(i, graph, visited, parent, cycles, depth)
 
-    # Удаление дубликатов с учётом направления
-    unique_cycles = []
-    for cycle in cycles:
-        # Нормализация: выбор минимальной вершины в качестве начала
-        min_vertex = min(cycle[:-1])
-        idx = cycle.index(min_vertex)
-        normalized = cycle[idx:-1] + cycle[:idx] + [min_vertex]
-        if normalized not in unique_cycles:
-            unique_cycles.append(normalized)
-
-    return unique_cycles
+    return cycles
 
 
 def save_result(input_file, matrix, cycles):
     with open(input_file, 'w', encoding='utf-8') as f:
-        # Сохраняем исходные данные
         f.write(f"{len(matrix)} 0\n")
         for row in matrix:
             f.write(' '.join(map(str, row)) + '\n')
 
-        # Запись результатов
         f.write("<Text>\n")
         f.write(f"Найдено циклов: {len(cycles)}\n")
         for i, cycle in enumerate(cycles, 1):
