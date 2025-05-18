@@ -1,6 +1,5 @@
 import sys
 
-
 def read_graph(input_file):
     with open(input_file, 'r', encoding='utf-8') as f:
         lines = f.readlines()
@@ -10,7 +9,6 @@ def read_graph(input_file):
             row = list(map(int, lines[i].strip().split()))
             matrix.append(row)
     return matrix, size
-
 
 def dfs(u, graph, visited, parent, cycles, depth):
     visited[u] = True
@@ -26,26 +24,26 @@ def dfs(u, graph, visited, parent, cycles, depth):
             # Проверка наличия всех рёбер в цикле
             cycle = []
             current = u
-            valid = True
             path = [current]
+            valid = True
 
             while current != v:
                 next_node = parent[current]
-                if graph[current][next_node] == 0:
+                if graph[current][next_node] == 0 and graph[next_node][current] == 0:
                     valid = False
                     break
                 path.append(next_node)
                 current = next_node
 
-            if valid and graph[path[-1]][u] == 1:
-                cycle = path + [u]
-                # Нормализация цикла для неориентированного графа
-                min_vertex = min(cycle[:-1])
-                idx = cycle.index(min_vertex)
-                normalized = cycle[idx:-1] + cycle[:idx] + [min_vertex]
-                if normalized not in cycles:
-                    cycles.append(normalized)
-
+            if valid:
+                # Проверка ребра между последней и первой вершиной
+                if graph[path[-1]][u] == 1 or graph[u][path[-1]] == 1:
+                    cycle = path + [u]
+                    # Нормализация для неориентированного графа
+                    cycle_sorted = sorted(cycle[:-1])
+                    cycle_sorted.append(cycle_sorted[0])
+                    if cycle_sorted not in cycles:
+                        cycles.append(cycle_sorted)
 
 def find_cycles(graph, size):
     visited = [False] * size
@@ -59,7 +57,6 @@ def find_cycles(graph, size):
 
     return cycles
 
-
 def save_result(input_file, matrix, cycles):
     with open(input_file, 'w', encoding='utf-8') as f:
         f.write(f"{len(matrix)} 0\n")
@@ -72,12 +69,10 @@ def save_result(input_file, matrix, cycles):
             cycle_str = " → ".join(map(str, cycle))
             f.write(f"Цикл {i}: {cycle_str}\n")
 
-
 def main(input_file):
     graph, size = read_graph(input_file)
     cycles = find_cycles(graph, size)
     save_result(input_file, graph, cycles)
-
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:
