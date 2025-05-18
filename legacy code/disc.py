@@ -23,20 +23,26 @@ def dfs(u, graph, visited, parent, cycles, depth):
             depth[v] = depth[u] + 1
             dfs(v, graph, visited, parent, cycles, depth)
         elif v != parent[u] and depth[v] < depth[u]:
-            # Проверяем наличие рёбер между всеми вершинами цикла
+            # Проверка наличия рёбер между всеми вершинами цикла
             cycle = []
             current = u
             valid = True
+            path = [current]
+
+            # Собираем вершины цикла
             while current != v:
-                cycle.append(current)
                 next_node = parent[current]
                 if graph[current][next_node] == 0:
                     valid = False
                     break
+                path.append(next_node)
                 current = next_node
+
             if valid:
-                cycle.extend([v, u])
-                cycles.append(cycle)
+                # Проверяем наличие ребра между последней и первой вершиной
+                if graph[path[-1]][u] == 1:
+                    cycle = path + [u]
+                    cycles.append(cycle)
 
 
 def find_cycles(graph, size):
@@ -49,12 +55,15 @@ def find_cycles(graph, size):
         if not visited[i]:
             dfs(i, graph, visited, parent, cycles, depth)
 
-    # Удаление дубликатов
+    # Удаление дубликатов с учётом направления
     unique_cycles = []
     for cycle in cycles:
-        normalized = sorted(cycle[:-1])  # Игнорируем последний элемент (дублирует первый)
-        if normalized not in [sorted(c[:-1]) for c in unique_cycles]:
-            unique_cycles.append(cycle)
+        # Нормализация: выбор минимальной вершины в качестве начала
+        min_vertex = min(cycle[:-1])
+        idx = cycle.index(min_vertex)
+        normalized = cycle[idx:-1] + cycle[:idx] + [min_vertex]
+        if normalized not in unique_cycles:
+            unique_cycles.append(normalized)
 
     return unique_cycles
 
