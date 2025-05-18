@@ -23,14 +23,20 @@ def dfs(u, graph, visited, parent, cycles, depth):
             depth[v] = depth[u] + 1
             dfs(v, graph, visited, parent, cycles, depth)
         elif v != parent[u] and depth[v] < depth[u]:
-            # Обнаружен цикл
+            # Проверяем наличие рёбер между всеми вершинами цикла
             cycle = []
             current = u
+            valid = True
             while current != v:
                 cycle.append(current)
-                current = parent[current]
-            cycle.extend([v, u])  # Замыкаем цикл
-            cycles.append(cycle)
+                next_node = parent[current]
+                if graph[current][next_node] == 0:
+                    valid = False
+                    break
+                current = next_node
+            if valid:
+                cycle.extend([v, u])
+                cycles.append(cycle)
 
 
 def find_cycles(graph, size):
