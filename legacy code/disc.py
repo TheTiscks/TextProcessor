@@ -8,12 +8,61 @@ def is_directed(graph):
                 return True
     return False
 
+def get_edges(graph, directed):
+    n = len(graph)
+    edges = []
+    for u in range(n):
+        for v in range(n):
+            if graph[u][v]:
+                if directed:
+                    edges.append((u, v))
+                else:
+                    if u < v and graph[u][v] == graph[v][u]:
+                        edges.append((u, v))
+    return edges
+
+def cycle_to_vector(cycle, edges, directed):
+    vector = [0] * len(edges)
+    for i in range(len(cycle)-1):
+        u, v = cycle[i], cycle[i+1]
+        if not directed:
+            edge = (min(u, v), max(u, v))
+        else:
+            edge = (u, v)
+        if edge in edges:
+            idx = edges.index(edge)
+            vector[idx] ^= 1
+    return vector
+
+def gaussian_elimination(vectors):
+    if not vectors:
+        return 0, []
+    matrix = [vec.copy() for vec in vectors]
+    rank = 0
+    rows = len(matrix)
+    cols = len(matrix[0])
+    for col in range(cols):
+        pivot = -1
+        for row in range(rank, rows):
+            if matrix[row][col] == 1:
+                pivot = row
+                break
+        if pivot == -1:
+            continue
+        matrix[rank], matrix[pivot] = matrix[pivot], matrix[rank]
+        for row in range(rows):
+            if row != rank and matrix[row][col] == 1:
+                matrix[row] = [(a ^ b) for a, b in zip(matrix[row], matrix[rank])]
+        rank += 1
+    return rank, matrix
+
 def find_cycle_basis(graph):
     n = len(graph)
     directed = is_directed(graph)
     visited = [False] * n
     parent = [-1] * n
-    cycle_basis = []
+    raw_cycles = []
+    edges = get_edges(graph, directed)
 
     def dfs(u):
         stack.append(u)
@@ -28,7 +77,7 @@ def find_cycle_basis(graph):
                         idx = stack.index(v)
                         cycle = stack[idx:] + [v]
                         if len(cycle) >= (3 if not directed else 2):
-                            cycle_basis.append(cycle)
+                            raw_cycles.append(cycle)
         stack.pop()
 
     for i in range(n):
@@ -36,29 +85,35 @@ def find_cycle_basis(graph):
             stack = []
             dfs(i)
 
-    # Нормализация циклов для неориентированных графов
+    cycle_vectors = []
+    valid_cycles = []
+    for cycle in raw_cycles:
+        vec = cycle_to_vector(cycle, edges, directed)
+        if sum(vec) > 0:
+            cycle_vectors.append(vec)
+            valid_cycles.append(cycle)
+
+    rank, basis_matrix = gaussian_elimination(cycle_vectors)
+    basis_indices = []
+    for row in basis_matrix[:rank]:
+        for idx, vec in enumerate(cycle_vectors):
+            if vec == row:
+                basis_indices.append(idx)
+                break
+
     unique_cycles = []
     seen = set()
-    for cycle in cycle_basis:
-        vertices = cycle[:-1]  # Убираем повторяющуюся вершину
+    for idx in basis_indices:
+        cycle = valid_cycles[idx]
+        vertices = list(dict.fromkeys(cycle[:-1]))
         if not directed:
-            if len(vertices) < 3:
-                continue
-            # Сортируем и находим минимальную вершину
-            min_vertex = min(vertices)
-            min_idx = vertices.index(min_vertex)
-            rotated = vertices[min_idx:] + vertices[:min_idx]
-            # Проверяем оба направления
-            if tuple(rotated) not in seen and tuple(reversed(rotated)) not in seen:
-                seen.add(tuple(rotated))
-                unique_cycles.append(sorted(rotated))
+            vertices = sorted(vertices)
+            key = tuple(vertices)
         else:
-            if len(vertices) < 2:
-                continue
-            cycle_tuple = tuple(vertices)
-            if cycle_tuple not in seen:
-                seen.add(cycle_tuple)
-                unique_cycles.append(vertices)
+            key = tuple(vertices)
+        if key not in seen:
+            seen.add(key)
+            unique_cycles.append(vertices)
 
     return unique_cycles, directed
 
