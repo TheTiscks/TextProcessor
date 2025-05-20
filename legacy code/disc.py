@@ -1,123 +1,68 @@
 import sys
 
-def is_directed(graph):
-    n = len(graph)
-    for i in range(n):
-        for j in range(n):
-            if graph[i][j] != graph[j][i]:
-                return True
-    return False
 
-def get_edges(graph, directed):
-    n = len(graph)
-    edges = []
-    for u in range(n):
-        for v in range(n):
-            if graph[u][v]:
-                if directed:
-                    edges.append((u, v))
-                else:
-                    if u < v and graph[u][v] == graph[v][u]:
-                        edges.append((u, v))
-    return edges
+def find_cycle_basis(graph, directed=False):
+    """
+    Находит базу циклов графа с использованием DFS.
+    :param graph: Матрица смежности графа
+    :param directed: Флаг, указывающий, является ли граф ориентированным
+    :return: Список циклов, образующих базу
+    """
 
-def cycle_to_vector(cycle, edges, directed):
-    vector = [0] * len(edges)
-    for i in range(len(cycle)-1):
-        u, v = cycle[i], cycle[i+1]
+    def dfs(v, parent, start, path, used, cycles):
+        used[v] = True
+        path.append(v)
+
+        # Проверяем соседей вершины
+        for u in range(len(graph)):
+            if graph[v][u]:  # Если есть ребро
+                # Для неориентированного графа пропускаем родителя
+                if not directed and u == parent:
+                    continue
+                # Если нашли вершину из текущего пути (кроме родителя), то найден цикл
+                if u in path:
+                    cycle_start = path.index(u)
+                    cycle = path[cycle_start:]
+                    # Для неориентированного графа проверяем минимальность цикла
+                    if directed or len(cycle) >= 3:
+                        cycles.append(cycle)
+                # Если вершина не посещена, продолжаем DFS
+                elif not used[u]:
+                    dfs(u, v, start, path, used, cycles)
+
+        path.pop()
+        # Для ориентированного графа не сбрасываем used, чтобы избежать повторных посещений
         if not directed:
-            edge = (min(u, v), max(u, v))
-        else:
-            edge = (u, v)
-        if edge in edges:
-            idx = edges.index(edge)
-            vector[idx] ^= 1
-    return vector
+            used[v] = False
 
-def gaussian_elimination(vectors):
-    if not vectors:
-        return 0, []
-    matrix = [vec.copy() for vec in vectors]
-    rank = 0
-    rows = len(matrix)
-    cols = len(matrix[0])
-    for col in range(cols):
-        pivot = -1
-        for row in range(rank, rows):
-            if matrix[row][col] == 1:
-                pivot = row
-                break
-        if pivot == -1:
-            continue
-        matrix[rank], matrix[pivot] = matrix[pivot], matrix[rank]
-        for row in range(rows):
-            if row != rank and matrix[row][col] == 1:
-                matrix[row] = [(a ^ b) for a, b in zip(matrix[row], matrix[rank])]
-        rank += 1
-    return rank, matrix
-
-def find_cycle_basis(graph):
     n = len(graph)
-    directed = is_directed(graph)
-    visited = [False] * n
-    parent = [-1] * n
-    raw_cycles = []
-    edges = get_edges(graph, directed)
+    cycles = []
+    used = [False] * n
 
-    def dfs(u):
-        stack.append(u)
-        visited[u] = True
-        for v in range(n):
-            if graph[u][v]:
-                if not visited[v]:
-                    parent[v] = u
-                    dfs(v)
-                else:
-                    if (directed or v != parent[u]) and v in stack:
-                        idx = stack.index(v)
-                        cycle = stack[idx:] + [v]
-                        if len(cycle) >= (3 if not directed else 2):
-                            raw_cycles.append(cycle)
-        stack.pop()
+    # Запускаем DFS из каждой вершины
+    for start in range(n):
+        dfs(start, -1, start, [], used, cycles)
 
-    for i in range(n):
-        if not visited[i]:
-            stack = []
-            dfs(i)
-
-    cycle_vectors = []
-    valid_cycles = []
-    for cycle in raw_cycles:
-        vec = cycle_to_vector(cycle, edges, directed)
-        if sum(vec) > 0:
-            cycle_vectors.append(vec)
-            valid_cycles.append(cycle)
-
-    rank, basis_matrix = gaussian_elimination(cycle_vectors)
-    basis_indices = []
-    for row in basis_matrix[:rank]:
-        for idx, vec in enumerate(cycle_vectors):
-            if vec == row:
-                basis_indices.append(idx)
-                break
-
+    # Фильтруем и минимизируем базу циклов
     unique_cycles = []
     seen = set()
-    for idx in basis_indices:
-        cycle = valid_cycles[idx]
-        vertices = list(dict.fromkeys(cycle[:-1]))
+    for cycle in cycles:
+        # Приводим цикл к "каноническому" виду (начинается с минимальной вершины)
+        min_idx = cycle.index(min(cycle))
+        canonical = tuple(cycle[min_idx:] + cycle[:min_idx])
+        # Для неориентированного графа добавляем обратный порядок
         if not directed:
-            vertices = sorted(vertices)
-            key = tuple(vertices)
-        else:
-            key = tuple(vertices)
-        if key not in seen:
-            seen.add(key)
-            unique_cycles.append(vertices)
+            canonical_rev = tuple(cycle[::-1])
+            canonical = min(canonical, canonical_rev)
+        if canonical not in seen:
+            seen.add(canonical)
+            unique_cycles.append(list(cycle))
 
-    return unique_cycles, directed
+    return unique_cycles
+
 
 def main(input_file):
+    # Чтение входного файла
     with open(input_file, 'r', encoding='utf-8') as f:
         lines = f.readlines()
         size = int(lines[0].strip())
@@ -125,18 +70,38 @@ def main(input_file):
         for i in range(1, size + 1):
             row = list(map(int, lines[i].strip().split()))
             matrix.append(row)
-    answer, directed = find_cycle_basis(matrix)
+
+    # Определяем, является ли граф ориентированным
+    directed = False
+    for i in range(size):
+        for j in range(size):
+            if matrix[i][j] != matrix[j][i]:
+                directed = True
+                break
+        if directed:
+            break
+
+    # Находим базу циклов
+    answer = find_cycle_basis(matrix, directed)
+
+    # Запись результата в файл
     with open(input_file, 'w', encoding='utf-8') as f:
         f.write(f"{size}\n")
         for i in range(size):
             f.write(' '.join(map(str, matrix[i])) + '\n')
         f.write("<Text>\n")
+        max_len = 0
         for cycle in answer:
-            if directed:
-                cycle_str = "{" + ", ".join(map(str, cycle)) + "}\n"
-            else:
-                cycle_str = "{" + ", ".join(map(str, sorted(cycle))) + "}\n"
-            f.write(cycle_str)
+            max_len = max(len(cycle), max_len)
+        for cycle in answer:
+            if len(cycle) == max_len:
+                f.write("{")
+                for j in range(len(cycle)):
+                    f.write(str(cycle[j]))
+                    if j < len(cycle) - 1:
+                        f.write(', ')
+                f.write("}\n")
+
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:
