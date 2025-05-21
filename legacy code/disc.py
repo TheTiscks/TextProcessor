@@ -1,4 +1,5 @@
 import sys
+from collections import defaultdict
 
 def is_directed(graph):
     n = len(graph)
@@ -15,6 +16,7 @@ def find_cycle_basis(graph):
     parent = [-1] * n
     cycles = []
     stack = []
+    edge_states = defaultdict(int)  # Для отслеживания посещённых рёбер
 
     def dfs(u):
         nonlocal stack
@@ -24,42 +26,45 @@ def find_cycle_basis(graph):
             if graph[u][v]:
                 if not visited[v]:
                     parent[v] = u
+                    edge_states[(u, v)] += 1
                     dfs(v)
+                    edge_states[(u, v)] -= 1
                 else:
+                    # Для неориентированных графов игнорируем обратное ребро к родителю
                     if (directed or v != parent[u]) and v in stack:
                         idx = stack.index(v)
                         cycle = stack[idx:] + [v]
+                        # Проверка на минимальную длину цикла
                         if (directed and len(cycle) >= 2) or (not directed and len(cycle) >= 3):
-                            cycles.append(cycle)
+                            # Нормализация цикла
+                            vertices = sorted(list(set(cycle[:-1])))
+                            if vertices not in cycles:
+                                cycles.append(vertices)
         stack.pop()
+        visited[u] = False  # Сбрасываем посещение для поиска всех циклов
 
-    for i in range(n):
-        if not visited[i]:
+    # Для ориентированных графов перебираем все вершины
+    for start in range(n):
+        if not visited[start]:
             stack = []
-            dfs(i)
+            dfs(start)
 
-    # Удаление избыточных циклов
-    unique_cycles = []
-    seen = set()
+    # Фильтрация циклов: удаляем надмножества
+    basis = []
+    cycles.sort(key=lambda x: len(x))
     for cycle in cycles:
-        vertices = sorted(list(dict.fromkeys(cycle[:-1])))  # Сортировка и удаление дублей
-        if directed:
-            key = tuple(vertices)
-        else:
-            key = tuple(vertices)
-            reversed_key = tuple(reversed(vertices))
-        if key not in seen and (not directed and reversed_key not in seen):
-            seen.add(key)
-            # Проверка на минимальность: цикл не должен содержать подциклы
-            is_minimal = True
-            for existing in unique_cycles:
-                if set(existing).issubset(set(vertices)):
-                    is_minimal = False
-                    break
-            if is_minimal:
-                unique_cycles.append(vertices)
+        cycle_set = set(cycle)
+        is_independent = True
+        for existing in basis:
+            if existing.issubset(cycle_set):
+                is_independent = False
+                break
+        if is_independent:
+            basis.append(cycle_set)
 
-    return unique_cycles, directed
+    # Преобразуем обратно в списки и сортируем
+    result = [sorted(list(s)) for s in basis]
+    return result, directed
 
 def main(input_file):
     with open(input_file, 'r', encoding='utf-8') as f:
@@ -75,8 +80,8 @@ def main(input_file):
         for i in range(size):
             f.write(' '.join(map(str, matrix[i])) + '\n')
         f.write("<Text>\n")
-        for cycle in answer:
-            cycle_str = "{" + ", ".join(map(str, sorted(cycle))) + "}\n"
+        for cycle in sorted(answer, key=lambda x: (len(x), x)):
+            cycle_str = "{" + ", ".join(map(str, cycle)) + "}\n"
             f.write(cycle_str)
 
 if __name__ == '__main__':
