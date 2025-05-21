@@ -70,6 +70,7 @@ def find_cycle_basis(graph):
                     parent[v] = u
                     dfs(v)
                 else:
+                    # Учитываем циклы, игнорируя обратные рёбра к родителю
                     if (directed or v != parent[u]) and v in stack:
                         idx = stack.index(v)
                         cycle = stack[idx:] + [v]
@@ -104,13 +105,18 @@ def find_cycle_basis(graph):
         cycle = valid_cycles[idx]
         vertices = list(dict.fromkeys(cycle[:-1]))
         if not directed:
+            # Нормализация: сортировка и удаление повторов
             vertices = sorted(vertices)
             key = tuple(vertices)
+            reversed_key = tuple(reversed(vertices))
+            if key not in seen and reversed_key not in seen:
+                seen.add(key)
+                unique_cycles.append(vertices)
         else:
             key = tuple(vertices)
-        if key not in seen:
-            seen.add(key)
-            unique_cycles.append(vertices)
+            if key not in seen:
+                seen.add(key)
+                unique_cycles.append(vertices)
 
     return unique_cycles, directed
 
