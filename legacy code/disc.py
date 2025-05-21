@@ -4,9 +4,9 @@ from collections import deque
 
 def find_cycle_basis(graph):
     n = len(graph)
-    visited = [False] * n
     parent = [-1] * n
-    edge_used = {}  # Хранит рёбра остовного дерева
+    visited = [False] * n
+    edge_used = set()
     non_tree_edges = []
     cycles = []
 
@@ -18,62 +18,73 @@ def find_cycle_basis(graph):
             while queue:
                 u = queue.popleft()
                 for v in range(n):
-                    if graph[u][v] and not visited[v]:
-                        visited[v] = True
-                        parent[v] = u
-                        edge_used[(min(u, v), max(u, v))] = True
-                        queue.append(v)
-                    elif graph[u][v] and parent[u] != v and (min(u, v), max(u, v)) not in edge_used:
-                        non_tree_edges.append((u, v))
+                    if graph[u][v]:
+                        if not visited[v]:
+                            visited[v] = True
+                            parent[v] = u
+                            edge_used.add((min(u, v), max(u, v)))
+                            queue.append(v)
+                        elif (min(u, v), max(u, v)) not in edge_used and parent[u] != v:
+                            non_tree_edges.append((u, v))
 
-    # Находим фундаментальные циклы для каждого недревесного ребра
+    # Построение дерева в виде списка смежности
+    tree = [[] for _ in range(n)]
+    for v in range(n):
+        if parent[v] != -1:
+            u = parent[v]
+            tree[u].append(v)
+            tree[v].append(u)
+
+    # Поиск пути между вершинами в дереве через BFS
+    def bfs_path(start, end):
+        visited_path = [False] * n
+        queue = deque()
+        queue.append((start, [start]))
+        visited_path[start] = True
+        while queue:
+            node, path = queue.popleft()
+            if node == end:
+                return path
+            for neighbor in tree[node]:
+                if not visited_path[neighbor]:
+                    visited_path[neighbor] = True
+                    queue.append((neighbor, path + [neighbor]))
+        return None
+
+    # Обработка недревесных рёбер
     for u, v in non_tree_edges:
-        # Находим путь от u до v в дереве
-        path_u = []
-        path_v = []
-        current = u
-        while current != -1:
-            path_u.append(current)
-            current = parent[current]
-        current = v
-        while current != -1:
-            path_v.append(current)
-            current = parent[current]
-        # Находим общего предка
-        i = len(path_u) - 1
-        j = len(path_v) - 1
-        while i >= 0 and j >= 0 and path_u[i] == path_v[j]:
-            i -= 1
-            j -= 1
-        # Собираем цикл
-        cycle = path_u[:i + 1] + path_v[j + 1::-1]
-        cycle_edges = set()
-        for i in range(len(cycle) - 1):
-            a, b = sorted((cycle[i], cycle[i + 1]))
-            cycle_edges.add((a, b))
-        # Добавляем недревесное ребро
-        a, b = sorted((u, v))
-        cycle_edges.add((a, b))
-        cycles.append(cycle_edges)
+        path = bfs_path(u, v)
+        if path:
+            cycle = path + [u]
+            # Убираем повторяющиеся вершины (если есть)
+            unique_cycle = []
+            seen = set()
+            for node in cycle:
+                if node not in seen:
+                    seen.add(node)
+                    unique_cycle.append(node)
+            if len(unique_cycle) >= 3:
+                cycles.append(sorted(unique_cycle))
 
-    # Преобразуем циклы в множества вершин
+    # Удаление дубликатов и фильтрация базиса
     basis = []
-    for cycle in cycles:
-        vertices = set()
-        for a, b in cycle:
-            vertices.add(a)
-            vertices.add(b)
-        basis.append(sorted(vertices))
-
-    # Удаляем дубликаты
-    unique_basis = []
     seen = set()
-    for cycle in basis:
-        t = tuple(cycle)
-        if t not in seen:
-            seen.add(t)
-            unique_basis.append(cycle)
-    return unique_basis, False
+    # Сортировка циклов по длине для обработки от меньших к большим
+    cycles.sort(key=lambda x: len(x))
+    for cycle in cycles:
+        cycle_tuple = tuple(sorted(cycle))
+        if cycle_tuple not in seen:
+            # Проверяем, не покрывается ли цикл уже существующими
+            is_independent = True
+            for existing in seen:
+                if set(existing).issubset(cycle_tuple):
+                    is_independent = False
+                    break
+            if is_independent:
+                seen.add(cycle_tuple)
+                basis.append(cycle)
+
+    return sorted(basis, key=lambda x: (len(x), x)), False
 
 
 def main(input_file):
