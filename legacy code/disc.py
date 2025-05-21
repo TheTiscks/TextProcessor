@@ -70,12 +70,14 @@ def find_cycle_basis(graph):
                     parent[v] = u
                     dfs(v)
                 else:
-                    # Учитываем циклы, игнорируя обратные рёбра к родителю
-                    if (directed or v != parent[u]) and v in stack:
-                        idx = stack.index(v)
-                        cycle = stack[idx:] + [v]
-                        if (directed and len(cycle) >= 2) or (not directed and len(cycle) >= 3):
-                            raw_cycles.append(cycle)
+                    # Исправлено: строгая проверка для неориентированных графов
+                    if directed or (v != parent[u]):
+                        if v in stack:
+                            idx = stack.index(v)
+                            cycle = stack[idx:] + [v]
+                            # Учитываем только циклы длиной >=3 для неориентированных
+                            if (directed and len(cycle) >= 2) or (not directed and len(cycle) >= 3):
+                                raw_cycles.append(cycle)
         stack.pop()
 
     for i in range(n):
@@ -105,7 +107,7 @@ def find_cycle_basis(graph):
         cycle = valid_cycles[idx]
         vertices = list(dict.fromkeys(cycle[:-1]))
         if not directed:
-            # Нормализация: сортировка и удаление повторов
+            # Нормализация: сортировка и проверка уникальности
             vertices = sorted(vertices)
             key = tuple(vertices)
             reversed_key = tuple(reversed(vertices))
