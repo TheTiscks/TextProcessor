@@ -10,7 +10,7 @@ def find_cycle_basis(graph):
     non_tree_edges = []
     cycles = []
 
-    # Построение остовного дерева с помощью BFS
+    # Построение остовного дерева через BFS
     for start in range(n):
         if not visited[start]:
             queue = deque([start])
@@ -24,22 +24,21 @@ def find_cycle_basis(graph):
                             parent[v] = u
                             edge_used.add((min(u, v), max(u, v)))
                             queue.append(v)
-                        elif (min(u, v), max(u, v)) not in edge_used and parent[u] != v:
-                            non_tree_edges.append((u, v))
+                        else:
+                            # Условие для недревесных рёбер
+                            if (min(u, v), max(u, v)) not in edge_used and parent[u] != v:
+                                non_tree_edges.append((u, v))
 
     # Построение дерева в виде списка смежности
     tree = [[] for _ in range(n)]
-    for v in range(n):
-        if parent[v] != -1:
-            u = parent[v]
-            tree[u].append(v)
-            tree[v].append(u)
+    for u, v in edge_used:
+        tree[u].append(v)
+        tree[v].append(u)
 
-    # Поиск пути между вершинами в дереве через BFS
+    # Поиск пути через BFS в дереве
     def bfs_path(start, end):
         visited_path = [False] * n
-        queue = deque()
-        queue.append((start, [start]))
+        queue = deque([(start, [start])])
         visited_path[start] = True
         while queue:
             node, path = queue.popleft()
@@ -56,7 +55,6 @@ def find_cycle_basis(graph):
         path = bfs_path(u, v)
         if path:
             cycle = path + [u]
-            # Убираем повторяющиеся вершины (если есть)
             unique_cycle = []
             seen = set()
             for node in cycle:
@@ -66,23 +64,20 @@ def find_cycle_basis(graph):
             if len(unique_cycle) >= 3:
                 cycles.append(sorted(unique_cycle))
 
-    # Удаление дубликатов и фильтрация базиса
+    # Фильтрация циклов
     basis = []
     seen = set()
-    # Сортировка циклов по длине для обработки от меньших к большим
     cycles.sort(key=lambda x: len(x))
     for cycle in cycles:
-        cycle_tuple = tuple(sorted(cycle))
-        if cycle_tuple not in seen:
-            # Проверяем, не покрывается ли цикл уже существующими
-            is_independent = True
-            for existing in seen:
-                if set(existing).issubset(cycle_tuple):
-                    is_independent = False
-                    break
-            if is_independent:
-                seen.add(cycle_tuple)
-                basis.append(cycle)
+        cycle_tuple = tuple(cycle)
+        is_independent = True
+        for existing in seen:
+            if set(existing).issubset(cycle_tuple):
+                is_independent = False
+                break
+        if is_independent:
+            seen.add(cycle_tuple)
+            basis.append(cycle)
 
     return sorted(basis, key=lambda x: (len(x), x)), False
 
