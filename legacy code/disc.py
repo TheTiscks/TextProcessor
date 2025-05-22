@@ -1,9 +1,6 @@
 import sys
-from collections import deque
-
 
 def find_triangles(graph, n):
-    """Находит все треугольники в графе."""
     triangles = []
     for i in range(n):
         for j in range(i + 1, n):
@@ -12,68 +9,62 @@ def find_triangles(graph, n):
                     triangles.append(sorted([i, j, k]))
     return triangles
 
-
 def find_cycle_basis(graph):
-    """Находит базис циклов, предпочитая треугольники."""
     n = len(graph)
-    m = sum(sum(row) for row in graph) // 2  # Количество рёбер
-    cycle_space_dim = m - n + 1  # Размерность циклического пространства
+    m = sum(sum(row) for row in graph) // 2
 
-    # Находим все треугольники
-    triangles = find_triangles(graph, n)
-
-    if len(triangles) >= cycle_space_dim:
-        # Берём первые cycle_space_dim треугольников
-        basis = triangles[:cycle_space_dim]
-    else:
-        # Если треугольников недостаточно, находим фундаментальные циклы
-        parent = [-1] * n
-        visited = [False] * n
-        non_tree_edges = []
-        cycles = []
-
-        # Строим остовное дерево с помощью BFS
-        queue = deque([0])
-        visited[0] = True
-        while queue:
-            u = queue.popleft()
-            for v in range(n):
-                if graph[u][v]:
-                    if not visited[v]:
+    # Подсчет компонент связности
+    components = 0
+    visited = [False] * n
+    for i in range(n):
+        if not visited[i]:
+            components += 1
+            stack = [i]
+            visited[i] = True
+            while stack:
+                u = stack.pop()
+                for v in range(n):
+                    if graph[u][v] and not visited[v]:
                         visited[v] = True
-                        parent[v] = u
-                        queue.append(v)
-                    elif v != parent[u]:
-                        non_tree_edges.append((u, v))
+                        stack.append(v)
 
-        # Находим циклы для нетривиальных рёбер
-        for u, v in non_tree_edges:
-            path_u = []
-            current = u
-            while current != -1:
-                path_u.append(current)
-                current = parent[current]
-            path_u = path_u[::-1]
-            path_v = []
-            current = v
-            while current != -1:
-                path_v.append(current)
-                current = parent[current]
-            path_v = path_v[::-1]
-            # Находим LCA
-            i = 0
-            while i < min(len(path_u), len(path_v)) and path_u[i] == path_v[i]:
-                i += 1
-            lca = path_u[i - 1] if i > 0 else None
-            # Формируем цикл
-            cycle = path_u[i:] + [lca] + path_v[i:][::-1] + [u]
-            unique_cycle = sorted(set(cycle))
-            if unique_cycle not in cycles:
-                cycles.append(unique_cycle)
-        basis = cycles[:cycle_space_dim]
+    cycle_space_dim = m - n + components
+    if cycle_space_dim < 0:
+        cycle_space_dim = 0
 
-    return sorted(basis, key=lambda x: (len(x), x)), False
+    visited = [False] * n
+    parent = [-1] * n
+    cycles = []
 
+    triangles = find_triangles(graph, n)
+    if len(triangles) >= cycle_space_dim:
+        return sorted(triangles[:cycle_space_dim], key=lambda x: (len(x), x)), False
+
+    def dfs(u, par, ancestors):
+        visited[u] = True
+        parent[u] = par
+        ancestors.append(u)
+        for v in range(n):
+            if graph[u][v] and v != par:
+                if not visited[v]:
+                    dfs(v, u, ancestors.copy())
+                else:
+                    if v in ancestors:
+                        idx = ancestors.index(v)
+                        cycle = ancestors[idx:] + [v]
+                        unique_cycle = sorted(set(cycle))
+                        if len(unique_cycle) >= 3 and unique_cycle not in cycles:
+                            cycles.append(unique_cycle)
+        ancestors.pop()  # Удаление текущей вершины из стека
+
+    # Запуск DFS для каждой непосещенной вершины
+    for i in range(n):
+        if not visited[i]:
+            dfs(i, -1, [])
+
+    # Сортировка и возврат нужного количества циклов
+    sorted_cycles = sorted(cycles, key=lambda x: (len(x), x))
+    return sorted_cycles[:cycle_space_dim], False
 
 def main(input_file):
     with open(input_file, 'r', encoding='utf-8') as f:
@@ -84,13 +75,11 @@ def main(input_file):
     answer, directed = find_cycle_basis(matrix)
     with open(input_file, 'w', encoding='utf-8') as f:
         f.write(f"{size}\n")
-        for i in range(size):
-            f.write(' '.join(map(str, matrix[i])) + '\n')
+        for row in matrix:
+            f.write(' '.join(map(str, row)) + '\n')
         f.write("<Text>\n")
         for cycle in sorted(answer, key=lambda x: (len(x), x)):
-            cycle_str = "{" + ", ".join(map(str, cycle)) + "}\n"
-            f.write(cycle_str)
-
+            f.write("{" + ", ".join(map(str, cycle)) + "}\n")
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:
