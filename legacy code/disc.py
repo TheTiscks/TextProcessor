@@ -2,69 +2,85 @@ import sys
 from collections import deque
 
 
-def find_path_in_tree(parent, u, v):
-    path_u = []
-    current = u
-    while current != -1:
-        path_u.append(current)
-        current = parent[current]
-
-    path_v = []
-    current = v
-    while current != -1:
-        path_v.append(current)
-        current = parent[current]
-
-    i = len(path_u) - 1
-    j = len(path_v) - 1
-    while i >= 0 and j >= 0 and path_u[i] == path_v[j]:
-        i -= 1
-        j -= 1
-    lca_index = i + 1 if i + 1 < len(path_u) else 0
-    lca = path_u[lca_index]
-
-    path = path_u[:lca_index + 1][::-1] + path_v[:j + 1][::-1][1:]
-    return path
+def find_triangles(graph, n):
+    """Находит все треугольники в графе."""
+    triangles = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            for k in range(j + 1, n):
+                if graph[i][j] and graph[j][k] and graph[k][i]:
+                    triangles.append(sorted([i, j, k]))
+    return triangles
 
 
 def find_cycle_basis(graph):
+    """Находит базис циклов, предпочитая треугольники."""
     n = len(graph)
-    parent = [-1] * n
-    visited = [False] * n
-    non_tree_edges = []
-    cycles = []
+    m = sum(sum(row) for row in graph) // 2  # Количество рёбер
+    cycle_space_dim = m - n + 1  # Размерность циклического пространства
 
-    queue = deque([0])
-    visited[0] = True
-    while queue:
-        u = queue.popleft()
-        for v in range(n):
-            if graph[u][v]:
-                if not visited[v]:
-                    visited[v] = True
-                    parent[v] = u
-                    queue.append(v)
-                elif parent[u] != v and parent[v] != u:
-                    non_tree_edges.append((u, v))
+    # Находим все треугольники
+    triangles = find_triangles(graph, n)
 
-    for u, v in non_tree_edges:
-        path = find_path_in_tree(parent, u, v)
-        cycle = path + [u]
-        unique_cycle = sorted(set(cycle))
-        if unique_cycle not in cycles:
-            cycles.append(unique_cycle)
+    if len(triangles) >= cycle_space_dim:
+        # Берём первые cycle_space_dim треугольников
+        basis = triangles[:cycle_space_dim]
+    else:
+        # Если треугольников недостаточно, находим фундаментальные циклы
+        parent = [-1] * n
+        visited = [False] * n
+        non_tree_edges = []
+        cycles = []
 
-    return sorted(cycles, key=lambda x: (len(x), x)), False
+        # Строим остовное дерево с помощью BFS
+        queue = deque([0])
+        visited[0] = True
+        while queue:
+            u = queue.popleft()
+            for v in range(n):
+                if graph[u][v]:
+                    if not visited[v]:
+                        visited[v] = True
+                        parent[v] = u
+                        queue.append(v)
+                    elif v != parent[u]:
+                        non_tree_edges.append((u, v))
+
+        # Находим циклы для нетривиальных рёбер
+        for u, v in non_tree_edges:
+            path_u = []
+            current = u
+            while current != -1:
+                path_u.append(current)
+                current = parent[current]
+            path_u = path_u[::-1]
+            path_v = []
+            current = v
+            while current != -1:
+                path_v.append(current)
+                current = parent[current]
+            path_v = path_v[::-1]
+            # Находим LCA
+            i = 0
+            while i < min(len(path_u), len(path_v)) and path_u[i] == path_v[i]:
+                i += 1
+            lca = path_u[i - 1] if i > 0 else None
+            # Формируем цикл
+            cycle = path_u[i:] + [lca] + path_v[i:][::-1] + [u]
+            unique_cycle = sorted(set(cycle))
+            if unique_cycle not in cycles:
+                cycles.append(unique_cycle)
+        basis = cycles[:cycle_space_dim]
+
+    return sorted(basis, key=lambda x: (len(x), x)), False
 
 
 def main(input_file):
     with open(input_file, 'r', encoding='utf-8') as f:
         lines = f.readlines()
         size = int(lines[0].strip())
-        matrix = []
-        for i in range(1, size + 1):
-            row = list(map(int, lines[i].strip().split()))
-            matrix.append(row)
+        matrix = [list(map(int, line.strip().split())) for line in lines[1:size + 1]]
+
     answer, directed = find_cycle_basis(matrix)
     with open(input_file, 'w', encoding='utf-8') as f:
         f.write(f"{size}\n")
