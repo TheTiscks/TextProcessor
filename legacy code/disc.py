@@ -1,7 +1,6 @@
 import sys
 
 def find_triangles(graph, n, directed):
-    """Находит треугольники, учитывая ориентацию для диграфов."""
     triangles = []
     for i in range(n):
         for j in range(i + 1, n):
@@ -15,7 +14,7 @@ def find_triangles(graph, n, directed):
     return triangles
 
 def kosaraju_scc(graph, n):
-    """Подсчитывает компоненты сильной связности."""
+    # Для орграфов, компоненты связанности
     def dfs_fill(u, visited, order):
         visited[u] = True
         for v in range(n):
