@@ -192,7 +192,7 @@ def view_message(msg_id):
             const text = bytes.toString(CryptoJS.enc.Utf8);
             if(text){{
               document.getElementById('content').innerHTML = '<div style="color:#2e7d32;font-size:1.05rem;white-space:pre-wrap;">' + text + '</div><p style="color:#666">Сообщение больше не доступно.</p>';
-              fetch('/consume/{msg_id}').catch(()=>{});
+              fetch('/consume/{msg_id}').catch(()=>{{}});
             }} else {{
               throw new Error('bad key');
             }}
