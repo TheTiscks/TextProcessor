@@ -20,9 +20,10 @@ jobs:
 
       - name: Run linters
         run: |
-          ruff .
+          ruff check .
           black --check .
           isort --check-only .
+      
 
       - name: Run tests
         run: pytest -q
