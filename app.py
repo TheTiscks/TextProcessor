@@ -219,12 +219,11 @@ def send_notification(msg_id):
     payload = json.dumps({'event': 'message_viewed', 'msg_id': msg_id}).encode('utf-8')
     req = urllib.request.Request(webhook, data=payload, headers={'Content-Type': 'application/json'})
     try:
-        # timeout короткий, чтобы не блокировать сильно сервер
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            # игнорируем содержимое, логируем только код при необходимости
+        with urllib.request.urlopen(req, timeout=5):
             pass
     except urllib.error.URLError as e:
         app.logger.debug(f"Webhook POST error for {msg_id}: {e}")
+
 
 
 @app.route('/consume/<msg_id>')

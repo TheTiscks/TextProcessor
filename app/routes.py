@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, render_template_string, current_app, url_for
+from flask import Blueprint, request, jsonify, render_template_string, url_for
 from .models import db, Message
 from datetime import datetime, timedelta
 import secrets
