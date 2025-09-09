@@ -44,3 +44,20 @@ def view(token):
     if not msg:
         return "<h3>Not found or expired</h3>", 404
     return f"<h3>Encrypted: {msg.encrypted}</h3>"
+
+@bp.route("/consume/<token>")
+def consume(token):
+    msg = Message.query.filter_by(token=token).first()
+    if not msg:
+        return jsonify({"error": "Not found or expired"}), 404
+
+    # уменьшаем количество доступных просмотров
+    msg.views_left -= 1
+    db.session.commit()
+
+    # если просмотров больше не осталось — удаляем запись
+    if msg.views_left <= 0:
+        db.session.delete(msg)
+        db.session.commit()
+
+    return jsonify({"encrypted_msg": msg.encrypted})
