@@ -1,8 +1,7 @@
+# tests/test_api.py
 from app import create_app
-from app.models import db
-import json
 
-def test_create_and_consume(tmp_path, monkeypatch):
+def test_create_and_consume():
     app = create_app()
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
     with app.test_client() as client, app.app_context():
