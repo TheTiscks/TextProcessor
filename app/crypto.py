@@ -1,6 +1,8 @@
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-import os
 import base64
+import os
+
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 
 def encrypt_aes_gcm(plaintext: bytes, key: bytes) -> str:
     aesgcm = AESGCM(key)
@@ -8,6 +10,7 @@ def encrypt_aes_gcm(plaintext: bytes, key: bytes) -> str:
     ct = aesgcm.encrypt(iv, plaintext, None)
     # хранить iv + ct в base64
     return base64.b64encode(iv + ct).decode()
+
 
 def decrypt_aes_gcm(b64: str, key: bytes) -> bytes:
     raw = base64.b64decode(b64)
