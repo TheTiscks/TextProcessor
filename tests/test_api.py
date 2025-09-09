@@ -1,9 +1,10 @@
 # tests/test_api.py
 from app import create_app
 
+
 def test_create_and_consume():
     app = create_app()
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     with app.test_client() as client, app.app_context():
         # create
         res = client.post("/create", json={"encrypted_msg": "abc", "lifetime": "hour"})

@@ -1,14 +1,20 @@
-from flask import Blueprint, request, jsonify, render_template_string, url_for
-from .models import db, Message
-from datetime import datetime, timedelta
 import secrets
+from datetime import datetime, timedelta
+
+from flask import Blueprint, jsonify, render_template_string, request, url_for
+
+from .models import Message, db
 
 bp = Blueprint("main", __name__)
+
 
 @bp.route("/")
 def index():
     # render template from templates/index.html
-    return render_template_string(open("app/templates/index.html", "r", encoding="utf-8").read())
+    return render_template_string(
+        open("app/templates/index.html", "r", encoding="utf-8").read()
+    )
+
 
 @bp.route("/create", methods=["POST"])
 def create():
@@ -19,14 +25,14 @@ def create():
     if not encrypted:
         return jsonify({"error": "encrypted_msg required"}), 400
 
-    lifetimes = {"hour": 1, "day": 24, "week": 24*7}
+    lifetimes = {"hour": 1, "day": 24, "week": 24 * 7}
     hours = lifetimes.get(lifetime, 24)
     msg = Message(
         token=secrets.token_urlsafe(20),
         encrypted=encrypted,
         expires_at=datetime.utcnow() + timedelta(hours=hours),
         views_left=1,
-        webhook=webhook
+        webhook=webhook,
     )
     db.session.add(msg)
     db.session.commit()
