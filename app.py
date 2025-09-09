@@ -1,16 +1,17 @@
 # app.py — минимальная версия без email, без requests
-from flask import Flask, request, jsonify, render_template_string, url_for
-from datetime import datetime, timedelta
-import secrets
 import json
-import urllib.request
+import secrets
 import urllib.error
+import urllib.request
+from datetime import datetime, timedelta
+
+from flask import Flask, jsonify, render_template_string, request, url_for
 
 app = Flask(__name__)
 messages_db = {}
 
 # HTML-шаблон: убран input для email, оставлен webhook
-HTML_TEMPLATE = '''<!DOCTYPE html>
+HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
@@ -127,57 +128,58 @@ async function createSecretLink(){
 </script>
 </body>
 </html>
-'''
+"""
 
-@app.route('/')
+
+@app.route("/")
 def home():
     return render_template_string(HTML_TEMPLATE)
 
 
-@app.route('/create', methods=['POST'])
+@app.route("/create", methods=["POST"])
 def create_message():
     data = request.get_json(force=True) or {}
-    encrypted = data.get('encrypted_msg')
-    lifetime_key = data.get('lifetime', 'day')
-    notify_webhook = data.get('notify_webhook')
+    encrypted = data.get("encrypted_msg")
+    lifetime_key = data.get("lifetime", "day")
+    notify_webhook = data.get("notify_webhook")
 
     if not encrypted:
-        return jsonify({'error': 'encrypted_msg required'}), 400
+        return jsonify({"error": "encrypted_msg required"}), 400
 
     lifetimes = {
-        'hour': timedelta(hours=1),
-        'day': timedelta(days=1),
-        'week': timedelta(weeks=1)
+        "hour": timedelta(hours=1),
+        "day": timedelta(days=1),
+        "week": timedelta(weeks=1),
     }
     lifetime = lifetimes.get(lifetime_key, timedelta(days=1))
 
     msg_id = secrets.token_urlsafe(16)
     messages_db[msg_id] = {
-        'encrypted': encrypted,
-        'expires': datetime.utcnow() + lifetime,
-        'views_left': 1,
-        'notify_webhook': notify_webhook
+        "encrypted": encrypted,
+        "expires": datetime.utcnow() + lifetime,
+        "views_left": 1,
+        "notify_webhook": notify_webhook,
     }
 
-    url = url_for('view_message', msg_id=msg_id, _external=True)
-    return jsonify({'url': url})
+    url = url_for("view_message", msg_id=msg_id, _external=True)
+    return jsonify({"url": url})
 
 
-@app.route('/m/<msg_id>')
+@app.route("/m/<msg_id>")
 def view_message(msg_id):
     entry = messages_db.get(msg_id)
     now = datetime.utcnow()
-    if not entry or now > entry['expires']:
+    if not entry or now > entry["expires"]:
         messages_db.pop(msg_id, None)
-        return '''
+        return """
         <div style="max-width:600px;margin:3rem auto;padding:2rem;text-align:center;">
           <h2 style="color:#c62828">Сообщение устарело</h2>
           <p>Это сообщение было автоматически удалено или не найдено.</p>
         </div>
-        '''
+        """
 
-    encrypted_json = json.dumps(entry['encrypted'])
-    page = f'''
+    encrypted_json = json.dumps(entry["encrypted"])
+    page = f"""
     <!doctype html><html><head><meta charset="utf-8"><title>Secret</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     </head><body>
@@ -202,7 +204,7 @@ def view_message(msg_id):
         </script>
       </div>
     </body></html>
-    '''
+    """
     return page
 
 
@@ -212,12 +214,14 @@ def send_notification(msg_id):
     if not entry:
         return
 
-    webhook = entry.get('notify_webhook')
+    webhook = entry.get("notify_webhook")
     if not webhook:
         return
 
-    payload = json.dumps({'event': 'message_viewed', 'msg_id': msg_id}).encode('utf-8')
-    req = urllib.request.Request(webhook, data=payload, headers={'Content-Type': 'application/json'})
+    payload = json.dumps({"event": "message_viewed", "msg_id": msg_id}).encode("utf-8")
+    req = urllib.request.Request(
+        webhook, data=payload, headers={"Content-Type": "application/json"}
+    )
     try:
         with urllib.request.urlopen(req, timeout=5):
             pass
@@ -225,23 +229,22 @@ def send_notification(msg_id):
         app.logger.debug(f"Webhook POST error for {msg_id}: {e}")
 
 
-
-@app.route('/consume/<msg_id>')
+@app.route("/consume/<msg_id>")
 def consume_message(msg_id):
     entry = messages_db.get(msg_id)
     if not entry:
-        return '', 204
+        return "", 204
     try:
-        entry['views_left'] = max(0, entry.get('views_left', 1) - 1)
-        if entry['views_left'] <= 0:
+        entry["views_left"] = max(0, entry.get("views_left", 1) - 1)
+        if entry["views_left"] <= 0:
             try:
                 send_notification(msg_id)
             finally:
                 messages_db.pop(msg_id, None)
     except Exception as e:
         app.logger.error(f"Consume error: {e}")
-    return '', 200
+    return "", 200
 
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)

@@ -1,5 +1,6 @@
 import sys
 
+
 def find_triangles(graph, n, directed):
     triangles = []
     for i in range(n):
@@ -9,9 +10,14 @@ def find_triangles(graph, n, directed):
                     if graph[i][j] and graph[j][k] and graph[k][i]:
                         triangles.append([i, j, k])
                 else:
-                    if (graph[i][j] or graph[j][i]) and (graph[j][k] or graph[k][j]) and (graph[k][i] or graph[i][k]):
+                    if (
+                        (graph[i][j] or graph[j][i])
+                        and (graph[j][k] or graph[k][j])
+                        and (graph[k][i] or graph[i][k])
+                    ):
                         triangles.append([i, j, k])
     return triangles
+
 
 def kosaraju_scc(graph, n):
     # Для орграфов, компоненты связанности
@@ -48,6 +54,7 @@ def kosaraju_scc(graph, n):
             components += 1
     return components
 
+
 def find_cycle_basis(graph):
     n = len(graph)
     # Определяем, ориентированный ли граф
@@ -61,7 +68,11 @@ def find_cycle_basis(graph):
             break
 
     # Подсчёт рёбер
-    m = sum(sum(row) for row in graph) if directed else sum(sum(row) for row in graph) // 2
+    m = (
+        sum(sum(row) for row in graph)
+        if directed
+        else sum(sum(row) for row in graph) // 2
+    )
 
     # Подсчёт компонент
     if directed:
@@ -96,7 +107,9 @@ def find_cycle_basis(graph):
         visited[u] = True
         path.append(u)
         for v in range(n):
-            if (directed and graph[u][v]) or (not directed and (graph[u][v] or graph[v][u])):
+            if (directed and graph[u][v]) or (
+                not directed and (graph[u][v] or graph[v][u])
+            ):
                 if v != par:
                     if not visited[v]:
                         dfs(v, u, path)
@@ -113,21 +126,23 @@ def find_cycle_basis(graph):
 
     return sorted(cycles[:cycle_space_dim], key=lambda x: (len(x), x)), directed
 
+
 def main(input_file):
-    with open(input_file, 'r', encoding='utf-8') as f:
+    with open(input_file, "r", encoding="utf-8") as f:
         lines = f.readlines()
         size = int(lines[0].strip())
-        matrix = [list(map(int, line.strip().split())) for line in lines[1:size + 1]]
+        matrix = [list(map(int, line.strip().split())) for line in lines[1 : size + 1]]
 
     answer, _ = find_cycle_basis(matrix)
-    with open(input_file, 'w', encoding='utf-8') as f:
+    with open(input_file, "w", encoding="utf-8") as f:
         f.write(f"{size}\n")
         for row in matrix:
-            f.write(' '.join(map(str, row)) + '\n')
+            f.write(" ".join(map(str, row)) + "\n")
         f.write("<Text>\n")
         for cycle in answer:
             f.write("{" + ", ".join(map(str, cycle)) + "}\n")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     if len(sys.argv) == 2:
         main(sys.argv[1])
