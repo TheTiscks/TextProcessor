@@ -38,12 +38,14 @@ def create():
     db.session.commit()
     return jsonify({"url": url_for("main.view", token=msg.token, _external=True)})
 
+
 @bp.route("/m/<token>")
 def view(token):
     msg = Message.query.filter_by(token=token).first()
     if not msg:
         return "<h3>Not found or expired</h3>", 404
     return f"<h3>Encrypted: {msg.encrypted}</h3>"
+
 
 @bp.route("/consume/<token>")
 def consume(token):
