@@ -30,6 +30,15 @@ jobs:
           ruff check .
           black --check .
           isort --check-only .
+      - name: Build C library
+        run: |
+          set -e
+          unameOut="$(uname -s)"
+          if [ "$unameOut" = "Darwin" ]; then
+            gcc -dynamiclib -o c_lib/libcrypto.dylib c_lib/crypto.c
+          else
+            gcc -shared -fPIC -o c_lib/libcrypto.so c_lib/crypto.c
+          fi
       - name: Run tests
         run: PYTHONPATH=. pytest -q
 
