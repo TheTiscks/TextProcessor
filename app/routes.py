@@ -2,7 +2,9 @@ import secrets
 from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, render_template_string, request, url_for
+
 from app.crypto_wrapper import generate_key
+
 from .models import Message, db
 
 bp = Blueprint("main", __name__)
@@ -23,7 +25,7 @@ def create():
     lifetime = data.get("lifetime", "day")
     if not encrypted:
         return jsonify({"error": "encrypted_msg required"}), 400
-    lifetimes = {"hour": 1, "day": 24, "week": 24*7}
+    lifetimes = {"hour": 1, "day": 24, "week": 24 * 7}
     hours = lifetimes.get(lifetime, 24)
     msg = Message(
         token=generate_key(24),  # <-- ключ генерируется C-библиотекой
