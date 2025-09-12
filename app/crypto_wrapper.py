@@ -1,9 +1,10 @@
 import ctypes
 import os
-import sys
 import secrets
+import sys
 
 _THIS_DIR = os.path.dirname(__file__)
+
 
 def _default_lib_path():
     # ожидаем, что скомпиленная библиотека лежит в c_lib/
@@ -15,6 +16,7 @@ def _default_lib_path():
     if sys.platform == "win32":
         return os.path.join(base, "crypto.dll")
     return os.path.join(base, "libcrypto.so")
+
 
 _USING_C = False
 _lib = None
@@ -36,6 +38,7 @@ except Exception:
 
 _CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+
 def generate_key(length: int) -> str:
     """
     Возвращает строковый ключ длины `length`.
@@ -54,7 +57,8 @@ def generate_key(length: int) -> str:
         return s
     else:
         # безопасный вариант на Python
-        return ''.join(secrets.choice(_CHARSET) for _ in range(length))
+        return "".join(secrets.choice(_CHARSET) for _ in range(length))
+
 
 def using_c() -> bool:
     # Вернёт True если используется нативная библиотека.
