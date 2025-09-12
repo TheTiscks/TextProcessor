@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Secure Cryptor (minimal)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width:800px; margin:2rem auto; }
+    textarea,input,select { width:100%; padding:0.7rem; margin-top:0.6rem; border-radius:8px; }
+    button { padding:0.8rem 1.2rem; border-radius:8px; cursor:pointer; margin-right:8px; }
+    .result { margin-top:1rem; padding:1rem; border-radius:8px; background:#f3f3f3; word-break:break-word; }
+  </style>
+</head>
+<body>
+<div>
+  <h2>🔒 Secure Cryptor (minimal)</h2>
+
+  <div>
+    <button id="encryptBtn" onclick="setMode('encrypt')">🗝️ Шифровать</button>
+    <button id="decryptBtn" onclick="setMode('decrypt')">🔓 Дешифровать</button>
+  </div>
+
+  <textarea id="text" rows="6" placeholder="Введите текст..."></textarea>
+  <input id="key" type="password" placeholder="Ключ (любая длина)"/>
+  <input id="notifyWebhook" type="url" placeholder="Webhook URL (опционально)" />
+
+  <div id="lifetimeSection" style="margin-top:0.6rem;">
+    <select id="lifetime">
+      <option value="hour">1 час</option>
+      <option value="day" selected>1 день</option>
+      <option value="week">1 неделя</option>
+    </select>
+  </div>
+
+  <div style="margin-top:0.8rem;">
+    <button onclick="process()" id="actionBtn">Шифровать</button>
+    <button onclick="createSecretLink()">Создать ссылку</button>
+  </div>
+
+  <div id="result" class="result"></div>
+  <div id="linkResult" class="result" style="display:none;"></div>
+</div>
+
+<script>
+let currentMode = 'encrypt';
+function setMode(mode){
+  currentMode = mode;
+  document.getElementById('actionBtn').textContent = mode === 'encrypt' ? 'Шифровать' : 'Дешифровать';
+  document.getElementById('lifetimeSection').style.display = mode === 'encrypt' ? 'block' : 'none';
+  document.getElementById('encryptBtn').style.opacity = mode === 'encrypt' ? 1 : 0.7;
+  document.getElementById('decryptBtn').style.opacity = mode === 'decrypt' ? 1 : 0.7;
+}
+setMode('encrypt');
+
+function showError(msg){
+  const r = document.getElementById('result');
+  r.style.color = '#c62828'; r.textContent = msg;
+}
+function showSuccess(msg){
+  const r = document.getElementById('result');
+  r.style.color = '#2e7d32'; r.textContent = msg;
+}
+
+async function process(){
+  const text = document.getElementById('text').value;
+  const key = document.getElementById('key').value;
+  if(!text || !key){ showError('Заполните текст и ключ'); return; }
+  try{
+    if(currentMode === 'encrypt'){
+      const encrypted = CryptoJS.AES.encrypt(text, key).toString();
+      showSuccess('Зашифровано: ' + encrypted);
+    } else {
+      const bytes = CryptoJS.AES.decrypt(text, key);
+      const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+      if(!decrypted) throw new Error('bad');
+      showSuccess('Дешифровано: ' + decrypted);
+    }
+  } catch(e){
+    showError('Ошибка шифрования/дешифрования. Проверьте ключ и данные.');
+  }
+}
+
+async function createSecretLink(){
+  const text = document.getElementById('text').value;
+  const key = document.getElementById('key').value;
+  const lifetime = document.getElementById('lifetime').value;
+  const notifyWebhook = document.getElementById('notifyWebhook').value || null;
+
+  if(!text || !key){ showError('Заполните текст и ключ'); return; }
+
+  try{
+    const encrypted = CryptoJS.AES.encrypt(text, key).toString();
+    const res = await fetch('/create', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        encrypted_msg: encrypted,
+        lifetime: lifetime,
+        notify_webhook: notifyWebhook
+      })
+    });
+    const data = await res.json();
+    if(data.url){
+      const lr = document.getElementById('linkResult');
+      lr.style.display = 'block';
+      lr.innerHTML = '<strong>Ссылка:</strong><br><a href="'+data.url+'" target="_blank">'+data.url+'</a>';
+    } else {
+      showError('Не удалось создать ссылку');
+    }
+  } catch(e){
+    console.error(e);
+    showError('Ошибка при создании ссылки');
+  }
+}
+</script>
+</body>
+</html>

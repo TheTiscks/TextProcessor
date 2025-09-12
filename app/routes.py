@@ -10,12 +10,11 @@ from .models import Message, db
 bp = Blueprint("main", __name__)
 
 
+from flask import render_template
+
 @bp.route("/")
 def index():
-    # render template from templates/index.html
-    return render_template_string(
-        open("app/templates/index.html", "r", encoding="utf-8").read()
-    )
+    return render_template("index.html")
 
 
 @bp.route("/create", methods=["POST"])
