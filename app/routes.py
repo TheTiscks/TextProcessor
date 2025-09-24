@@ -1,12 +1,13 @@
 # import secrets
 from datetime import datetime, timedelta
 
-from flask import Blueprint, jsonify, request, url_for, render_template
+from flask import Blueprint, jsonify, render_template, request, url_for
 
 from app.crypto_wrapper import generate_key
-from app.models import db, Message
+from app.models import Message, db
 
 bp = Blueprint("main", __name__)
+
 
 @bp.route("/")
 def index():
