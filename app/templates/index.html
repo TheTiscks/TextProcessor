@@ -16,8 +16,8 @@
   <h2>🔒 Secure Cryptor (minimal)</h2>
 
   <div>
-    <button id="encryptBtn" onclick="setMode('encrypt')">🗝️ Шифровать</button>
-    <button id="decryptBtn" onclick="setMode('decrypt')">🔓 Дешифровать</button>
+    <button onclick="onCreateClicked()" id="actionBtn">Шифровать и упаковать</button>
+    <button onclick="onOpenClicked()">Дешифровать пакет</button>
   </div>
 
   <textarea id="text" rows="6" placeholder="Введите текст..."></textarea>
@@ -42,74 +42,174 @@
 </div>
 
 <script>
-let currentMode = 'encrypt';
-function setMode(mode){
-  currentMode = mode;
-  document.getElementById('actionBtn').textContent = mode === 'encrypt' ? 'Шифровать' : 'Дешифровать';
-  document.getElementById('lifetimeSection').style.display = mode === 'encrypt' ? 'block' : 'none';
-  document.getElementById('encryptBtn').style.opacity = mode === 'encrypt' ? 1 : 0.7;
-  document.getElementById('decryptBtn').style.opacity = mode === 'decrypt' ? 1 : 0.7;
+// ---------- Вспомогательные функции base64 / UTF-8 ----------
+function bufToBase64(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }
-setMode('encrypt');
-
-function showError(msg){
-  const r = document.getElementById('result');
-  r.style.color = '#c62828'; r.textContent = msg;
+function base64ToBuf(b64) {
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr.buffer;
 }
-function showSuccess(msg){
-  const r = document.getElementById('result');
-  r.style.color = '#2e7d32'; r.textContent = msg;
+function strToBuf(s) {
+  return new TextEncoder().encode(s);
+}
+function bufToStr(buf) {
+  return new TextDecoder().decode(buf);
 }
 
-async function process(){
-  const text = document.getElementById('text').value;
-  const key = document.getElementById('key').value;
-  if(!text || !key){ showError('Заполните текст и ключ'); return; }
-  try{
-    if(currentMode === 'encrypt'){
-      const encrypted = CryptoJS.AES.encrypt(text, key).toString();
-      showSuccess('Зашифровано: ' + encrypted);
-    } else {
-      const bytes = CryptoJS.AES.decrypt(text, key);
-      const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-      if(!decrypted) throw new Error('bad');
-      showSuccess('Дешифровано: ' + decrypted);
-    }
-  } catch(e){
-    showError('Ошибка шифрования/дешифрования. Проверьте ключ и данные.');
+// ---------- KDF: PBKDF2 -> AES-GCM key ----------
+async function deriveKeyPBKDF2(password, saltBuf, iterations = 200000, keyLen = 256) {
+  const alg = { name: "PBKDF2" };
+  const baseKey = await window.crypto.subtle.importKey(
+    "raw", strToBuf(password), alg, false, ["deriveKey"]
+  );
+  const derived = await window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: saltBuf,
+      iterations: iterations,
+      hash: "SHA-256",
+    },
+    baseKey,
+    { name: "AES-GCM", length: keyLen },
+    true,
+    ["encrypt", "decrypt"]
+  );
+  return derived;
+}
+
+// ---------- Encrypt text -> returns object with iv + cipher (ArrayBuffer) ----------
+async function encryptText(plainText, password) {
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKeyPBKDF2(password, salt, 200000, 256);
+  const cipherBuf = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv },
+    key,
+    strToBuf(plainText)
+  );
+  return {
+    salt: bufToBase64(salt.buffer),
+    iv: bufToBase64(iv.buffer),
+    cipher: bufToBase64(cipherBuf)
+  };
+}
+
+// ---------- Decrypt: takes the fields and password ----------
+async function decryptBlob(blobObj, password) {
+  const saltBuf = base64ToBuf(blobObj.salt);
+  const ivBuf = base64ToBuf(blobObj.iv);
+  const cipherBuf = base64ToBuf(blobObj.cipher);
+  const key = await deriveKeyPBKDF2(password, saltBuf, blobObj.iterations || 200000, 256);
+  try {
+    const plainBuf = await window.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: new Uint8Array(ivBuf) },
+      key,
+      cipherBuf
+    );
+    return bufToStr(plainBuf);
+  } catch (e) {
+    // возможна ошибка аутентификации (неверный ключ / повреждённые данные)
+    throw new Error("Decryption failed: bad password or corrupted data");
   }
 }
 
-async function createSecretLink(){
+// ---------- Pack/unpack the standard JSON format ----------
+function packBlob({ salt, iv, cipher, iterations = 200000 }) {
+  const json = {
+    v: 1,
+    kdf: "PBKDF2",
+    hash: "SHA-256",
+    iterations: iterations,
+    salt: salt,
+    algo: "AES-GCM",
+    iv: iv,
+    cipher: cipher
+  };
+  // encode whole JSON as base64 for compact single-line string
+  const jstr = JSON.stringify(json);
+  return btoa(unescape(encodeURIComponent(jstr)));
+}
+function unpackBlob(packedStr) {
+  const jstr = decodeURIComponent(escape(atob(packedStr)));
+  return JSON.parse(jstr);
+}
+
+// ---------- Helpers: download file & copy to clipboard ----------
+function downloadFile(filename, content) {
+  const blob = new Blob([content], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+async function copyToClipboard(text) {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+  } else {
+    // fallback
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+}
+
+// ---------- Integration examples (use in your UI) ----------
+async function createClientOnlyPackage(plainText, password) {
+  const enc = await encryptText(plainText, password);
+  // pack to compact string
+  const packed = packBlob(enc);
+  return { packed, key: password }; // key == password (or separate random string)
+}
+
+// Parse and decrypt package
+async function openClientOnlyPackage(packedStr, password) {
+  const blob = unpackBlob(packedStr);
+  const plain = await decryptBlob(blob, password);
+  return plain;
+}
+
+// ---------- Example usage for your UI handlers ----------
+async function onCreateClicked() {
   const text = document.getElementById('text').value;
-  const key = document.getElementById('key').value;
-  const lifetime = document.getElementById('lifetime').value;
-  const notifyWebhook = document.getElementById('notifyWebhook').value || null;
+  // either ask user for password or generate random
+  let password = document.getElementById('key').value;
+  if (!password) {
+    // generate a random 32-char key for user to copy
+    password = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                    .map(b => ("00" + b.toString(16)).slice(-2)).join("");
+    alert("Generated random key — copy and save it securely: " + password);
+  }
+  const { packed } = await createClientOnlyPackage(text, password);
+  // show packed string (single-line), allow download and copy
+  document.getElementById('result').style.color = "#2e7d32";
+  document.getElementById('result').textContent = "Encrypted package (copy+send):";
+  const out = document.getElementById('linkResult');
+  out.style.display = 'block';
+  out.innerHTML = '<textarea rows="6" style="width:100%;">' + packed + '</textarea>'
+    + '<div style="margin-top:.5rem;"><button onclick="copyToClipboard(document.querySelector(\\'#linkResult textarea\\').value)">Copy</button>'
+    + '<button onclick="downloadFile(\\'secret.pkg\\', document.querySelector(\\'#linkResult textarea\\').value)">Download</button></div>';
+}
 
-  if(!text || !key){ showError('Заполните текст и ключ'); return; }
-
-  try{
-    const encrypted = CryptoJS.AES.encrypt(text, key).toString();
-    const res = await fetch('/create', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        encrypted_msg: encrypted,
-        lifetime: lifetime,
-        notify_webhook: notifyWebhook
-      })
-    });
-    const data = await res.json();
-    if(data.url){
-      const lr = document.getElementById('linkResult');
-      lr.style.display = 'block';
-      lr.innerHTML = '<strong>Ссылка:</strong><br><a href="'+data.url+'" target="_blank">'+data.url+'</a>';
-    } else {
-      showError('Не удалось создать ссылку');
-    }
-  } catch(e){
-    console.error(e);
-    showError('Ошибка при создании ссылки');
+async function onOpenClicked() {
+  const packed = document.getElementById('text').value.trim();
+  const password = document.getElementById('key').value;
+  try {
+    const plain = await openClientOnlyPackage(packed, password);
+    document.getElementById('result').style.color = "#2e7d32";
+    document.getElementById('result').textContent = "Decrypted: " + plain;
+  } catch (e) {
+    document.getElementById('result').style.color = "#c62828";
+    document.getElementById('result').textContent = e.message;
   }
 }
 </script>
