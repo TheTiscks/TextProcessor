@@ -42,7 +42,7 @@
 </div>
 
 <script>
-// ---------- Вспомогательные функции base64 / UTF-8 ----------
+// ---------- Вспомогательные функции ----------
 function bufToBase64(buf) {
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }
@@ -59,85 +59,60 @@ function bufToStr(buf) {
   return new TextDecoder().decode(buf);
 }
 
-// ---------- KDF: PBKDF2 -> AES-GCM key ----------
 async function deriveKeyPBKDF2(password, saltBuf, iterations = 200000, keyLen = 256) {
-  const alg = { name: "PBKDF2" };
-  const baseKey = await window.crypto.subtle.importKey(
-    "raw", strToBuf(password), alg, false, ["deriveKey"]
+  const baseKey = await crypto.subtle.importKey(
+    "raw", strToBuf(password), "PBKDF2", false, ["deriveKey"]
   );
-  const derived = await window.crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: saltBuf,
-      iterations: iterations,
-      hash: "SHA-256",
-    },
+  return await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: saltBuf, iterations, hash: "SHA-256" },
     baseKey,
     { name: "AES-GCM", length: keyLen },
     true,
     ["encrypt", "decrypt"]
   );
-  return derived;
 }
 
-// ---------- Encrypt text -> returns object with iv + cipher (ArrayBuffer) ----------
 async function encryptText(plainText, password) {
-  const salt = window.crypto.getRandomValues(new Uint8Array(16));
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKeyPBKDF2(password, salt, 200000, 256);
-  const cipherBuf = await window.crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: iv },
+  const cipherBuf = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
     key,
     strToBuf(plainText)
   );
   return {
     salt: bufToBase64(salt.buffer),
     iv: bufToBase64(iv.buffer),
-    cipher: bufToBase64(cipherBuf)
+    cipher: bufToBase64(cipherBuf),
+    iterations: 200000
   };
 }
 
-// ---------- Decrypt: takes the fields and password ----------
 async function decryptBlob(blobObj, password) {
   const saltBuf = base64ToBuf(blobObj.salt);
   const ivBuf = base64ToBuf(blobObj.iv);
   const cipherBuf = base64ToBuf(blobObj.cipher);
   const key = await deriveKeyPBKDF2(password, saltBuf, blobObj.iterations || 200000, 256);
   try {
-    const plainBuf = await window.crypto.subtle.decrypt(
+    const plainBuf = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: new Uint8Array(ivBuf) },
       key,
       cipherBuf
     );
     return bufToStr(plainBuf);
   } catch (e) {
-    // возможна ошибка аутентификации (неверный ключ / повреждённые данные)
-    throw new Error("Decryption failed: bad password or corrupted data");
+    throw new Error("Ошибка: неверный пароль или повреждённые данные");
   }
 }
 
-// ---------- Pack/unpack the standard JSON format ----------
-function packBlob({ salt, iv, cipher, iterations = 200000 }) {
-  const json = {
-    v: 1,
-    kdf: "PBKDF2",
-    hash: "SHA-256",
-    iterations: iterations,
-    salt: salt,
-    algo: "AES-GCM",
-    iv: iv,
-    cipher: cipher
-  };
-  // encode whole JSON as base64 for compact single-line string
-  const jstr = JSON.stringify(json);
-  return btoa(unescape(encodeURIComponent(jstr)));
+function packBlob(obj) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
 }
 function unpackBlob(packedStr) {
-  const jstr = decodeURIComponent(escape(atob(packedStr)));
-  return JSON.parse(jstr);
+  return JSON.parse(decodeURIComponent(escape(atob(packedStr))));
 }
 
-// ---------- Helpers: download file & copy to clipboard ----------
 function downloadFile(filename, content) {
   const blob = new Blob([content], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
@@ -152,64 +127,66 @@ function downloadFile(filename, content) {
 async function copyToClipboard(text) {
   if (navigator.clipboard) {
     await navigator.clipboard.writeText(text);
-  } else {
-    // fallback
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    ta.remove();
   }
 }
 
-// ---------- Integration examples (use in your UI) ----------
-async function createClientOnlyPackage(plainText, password) {
-  const enc = await encryptText(plainText, password);
-  // pack to compact string
-  const packed = packBlob(enc);
-  return { packed, key: password }; // key == password (or separate random string)
-}
-
-// Parse and decrypt package
-async function openClientOnlyPackage(packedStr, password) {
-  const blob = unpackBlob(packedStr);
-  const plain = await decryptBlob(blob, password);
-  return plain;
-}
-
-// ---------- Example usage for your UI handlers ----------
+// ---------- Основные обработчики ----------
 async function onCreateClicked() {
-  const text = document.getElementById('text').value;
-  // either ask user for password or generate random
-  let password = document.getElementById('key').value;
-  if (!password) {
-    // generate a random 32-char key for user to copy
-    password = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-                    .map(b => ("00" + b.toString(16)).slice(-2)).join("");
-    alert("Generated random key — copy and save it securely: " + password);
+  const text = document.getElementById("text").value;
+  let password = document.getElementById("key").value;
+  if (!text) {
+    document.getElementById("result").style.color = "#c62828";
+    document.getElementById("result").textContent = "Введите текст!";
+    return;
   }
-  const { packed } = await createClientOnlyPackage(text, password);
-  // show packed string (single-line), allow download and copy
-  document.getElementById('result').style.color = "#2e7d32";
-  document.getElementById('result').textContent = "Encrypted package (copy+send):";
-  const out = document.getElementById('linkResult');
-  out.style.display = 'block';
-  out.innerHTML = '<textarea rows="6" style="width:100%;">' + packed + '</textarea>'
-    + '<div style="margin-top:.5rem;"><button onclick="copyToClipboard(document.querySelector(\\'#linkResult textarea\\').value)">Copy</button>'
-    + '<button onclick="downloadFile(\\'secret.pkg\\', document.querySelector(\\'#linkResult textarea\\').value)">Download</button></div>';
+  if (!password) {
+    // сгенерируем случайный пароль
+    password = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => ("00" + b.toString(16)).slice(-2))
+      .join("");
+    alert("Сгенерирован пароль (сохраните отдельно): " + password);
+  }
+  const enc = await encryptText(text, password);
+  const packed = packBlob(enc);
+
+  const resEl = document.getElementById("result");
+  resEl.style.color = "#2e7d32";
+  resEl.textContent = "✅ Упаковано успешно";
+
+  const out = document.getElementById("linkResult");
+  out.style.display = "block";
+  out.innerHTML = `
+    <textarea id="packedArea" rows="6" style="width:100%;">${packed}</textarea>
+    <div style="margin-top:.5rem;">
+      <button id="copyBtn">Скопировать</button>
+      <button id="downloadBtn">Скачать</button>
+    </div>
+  `;
+
+  document.getElementById("copyBtn").addEventListener("click", () => {
+    copyToClipboard(document.getElementById("packedArea").value);
+  });
+  document.getElementById("downloadBtn").addEventListener("click", () => {
+    downloadFile("secret.pkg", document.getElementById("packedArea").value);
+  });
 }
 
 async function onOpenClicked() {
-  const packed = document.getElementById('text').value.trim();
-  const password = document.getElementById('key').value;
+  const packed = document.getElementById("text").value.trim();
+  const password = document.getElementById("key").value;
+  if (!packed || !password) {
+    document.getElementById("result").style.color = "#c62828";
+    document.getElementById("result").textContent = "Введите пакет и пароль!";
+    return;
+  }
   try {
-    const plain = await openClientOnlyPackage(packed, password);
-    document.getElementById('result').style.color = "#2e7d32";
-    document.getElementById('result').textContent = "Decrypted: " + plain;
+    const blob = unpackBlob(packed);
+    const plain = await decryptBlob(blob, password);
+    document.getElementById("result").style.color = "#2e7d32";
+    document.getElementById("result").textContent = "🔓 Расшифровано: " + plain;
   } catch (e) {
-    document.getElementById('result').style.color = "#c62828";
-    document.getElementById('result').textContent = e.message;
+    document.getElementById("result").style.color = "#c62828";
+    document.getElementById("result").textContent = e.message;
   }
 }
 </script>
