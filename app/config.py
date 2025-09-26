@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+
 BASE = Path(__file__).resolve().parent.parent
 DB_PATH = os.getenv("TEXTCRYPTOR_DB", str(BASE / "data.sqlite"))
 

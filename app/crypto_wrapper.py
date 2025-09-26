@@ -20,7 +20,6 @@ def _default_lib_path():
 
 _USING_C = False
 _lib = None
-
 try:
     _libpath = _default_lib_path()
     if os.path.exists(_libpath):
@@ -35,7 +34,6 @@ try:
         _USING_C = False
 except Exception:
     _USING_C = False
-
 _CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 
@@ -46,7 +44,6 @@ def generate_key(length: int) -> str:
     """
     if length <= 0:
         return ""
-
     if _USING_C and _lib is not None:
         ptr = _lib.generate_key(length)
         if not ptr:
