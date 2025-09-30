@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>🔒 Client-only Cryptor</title>
+</head>
+<body>
+  <h2>Client-only Cryptor</h2>
+
+  <textarea id="text" rows="6" placeholder="Введите текст..."></textarea>
+  <input id="key" type="password" placeholder="Пароль (или оставьте пустым для генерации)"/>
+  <div>
+    <button id="encryptBtn">Шифровать и упаковать</button>
+    <button id="decryptBtn">Дешифровать пакет</button>
+  </div>
+
+  <div id="result" style="margin-top:1rem;color:blue;"></div>
+  <div id="linkResult" style="margin-top:1rem;display:none;"></div>
+
+  <script type="module">
+    import { encryptText, decryptBlob, packBlob, unpackBlob } from "./crypto.js";
+
+    function showMessage(msg, color="blue") {
+      const r = document.getElementById("result");
+      r.style.color = color;
+      r.textContent = msg;
+    }
+
+    document.getElementById("encryptBtn").addEventListener("click", async () => {
+      const text = document.getElementById("text").value;
+      let password = document.getElementById("key").value;
+      if (!text) return showMessage("Введите текст!", "red");
+      if (!password) {
+        password = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+          .map(b => ("00" + b.toString(16)).slice(-2)).join("");
+        alert("Сгенерирован пароль: " + password);
+      }
+      const enc = await encryptText(text, password);
+      const packed = packBlob(enc);
+      showMessage("✅ Упаковано успешно", "green");
+
+      const out = document.getElementById("linkResult");
+      out.style.display = "block";
+      out.innerHTML = `
+        <textarea id="packedArea" rows="6" style="width:100%;">${packed}</textarea>
+        <div style="margin-top:.5rem;">
+          <button id="copyBtn">Скопировать</button>
+          <button id="downloadBtn">Скачать</button>
+        </div>
+      `;
+      document.getElementById("copyBtn").addEventListener("click", () => {
+        navigator.clipboard.writeText(document.getElementById("packedArea").value);
+      });
+      document.getElementById("downloadBtn").addEventListener("click", () => {
+        const blob = new Blob([document.getElementById("packedArea").value], {type:"text/plain"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "secret.pkg";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+    });
+
+    document.getElementById("decryptBtn").addEventListener("click", async () => {
+      const packed = document.getElementById("text").value.trim();
+      const password = document.getElementById("key").value;
+      if (!packed || !password) return showMessage("Введите пакет и пароль!", "red");
+      try {
+        const blob = unpackBlob(packed);
+        const plain = await decryptBlob(blob, password);
+        showMessage("🔓 Расшифровано: " + plain, "green");
+      } catch (e) {
+        showMessage("Ошибка дешифровки: " + e.message, "red");
+      }
+    });
+  </script>
+</body>
+</html>
