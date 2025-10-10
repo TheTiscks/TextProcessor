@@ -101,3 +101,27 @@ export async function importAesKey(rawBytes) {
     ["encrypt", "decrypt"]
   );
 }
+
+
+// encrypt using raw key bytes (Uint8Array) directly
+export async function encryptWithRawKey(plainText, rawKeyBytes) {
+  const key = await importAesKey(rawKeyBytes);
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // 12 bytes for AES-GCM
+  const enc = new TextEncoder().encode(plainText);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc);
+  return {
+    v: 1,
+    algo: "AES-GCM",
+    iv: bytesToBase64Url(new Uint8Array(iv)),
+    cipher: bytesToBase64Url(new Uint8Array(ct))
+  };
+}
+
+// decrypt: blob has fields iv (base64url) and cipher (base64url)
+export async function decryptWithRawKey(blob, rawKeyBytes) {
+  const key = await importAesKey(rawKeyBytes);
+  const iv = base64UrlToBytes(blob.iv);
+  const ct = base64UrlToBytes(blob.cipher);
+  const plainBuf = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+  return new TextDecoder().decode(plainBuf);
+}
