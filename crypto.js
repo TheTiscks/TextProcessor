@@ -90,3 +90,14 @@ export function base64UrlToBytes(b64url) {
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return arr;
 }
+
+
+export async function importAesKey(rawBytes) {
+  return await crypto.subtle.importKey(
+    "raw",
+    rawBytes,
+    { name: "AES-GCM" },
+    false, // not extractable (we'll not export unless necessary)
+    ["encrypt", "decrypt"]
+  );
+}
