@@ -71,3 +71,22 @@ export function packBlob(obj) {
 export function unpackBlob(packedStr) {
   return JSON.parse(decodeURIComponent(escape(atob(packedStr))));
 }
+
+
+// base64url helpers
+export function bytesToBase64Url(bytes) {
+  // bytes: Uint8Array
+  let b64 = btoa(String.fromCharCode(...bytes));
+  // base64 -> base64url (remove padding, +/ -> -_)
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+export function base64UrlToBytes(b64url) {
+  // base64url -> base64
+  let b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+  // pad
+  while (b64.length % 4) b64 += "=";
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
