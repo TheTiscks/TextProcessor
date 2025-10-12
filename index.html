@@ -98,9 +98,13 @@ function downloadText(filename, text) {
   URL.revokeObjectURL(url);
 }
 function setUIEnabled(enabled) {
-  document.getElementById("encryptBtn").disabled = !enabled;
-  document.getElementById("decryptBtn").disabled = !enabled;
-  document.getElementById("genKeyBtn")?.disabled = !enabled;
+  const encBtn = document.getElementById("encryptBtn");
+  const decBtn = document.getElementById("decryptBtn");
+  const genBtn = document.getElementById("genKeyBtn");
+
+  if (encBtn) encBtn.disabled = !enabled;
+  if (decBtn) decBtn.disabled = !enabled;
+  if (genBtn) genBtn.disabled = !enabled;
 }
 
 /* ---------- UI handlers ---------- */
