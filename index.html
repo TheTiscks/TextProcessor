@@ -18,99 +18,235 @@
   <div id="linkResult" style="margin-top:1rem;display:none;"></div>
 
   <script type="module">
-  import {
-    generateKeyString,
-    base64UrlToBytes,
-    encryptWithRawKey,
-    decryptWithRawKey,
-    packBlobJSON,
-    unpackBlobJSON
-  } from "./crypto.js";
+function bytesToBase64Url(bytes) {
+  const b64 = btoa(String.fromCharCode(...bytes));
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function base64UrlToBytes(b64url) {
+  let b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4) b64 += "=";
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
 
-  function showMessage(msg, color = "blue") {
-    const r = document.getElementById("result");
-    r.style.color = color;
-    r.textContent = msg;
+/* ---------- key generation & import ---------- */
+function generateRawKeyBytes() {
+  return crypto.getRandomValues(new Uint8Array(32)); // 256-bit
+}
+function generateKeyString() {
+  return bytesToBase64Url(generateRawKeyBytes());
+}
+async function importAesKey(rawBytes) {
+  return await crypto.subtle.importKey("raw", rawBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+/* ---------- encrypt/decrypt using raw key bytes ---------- */
+async function encryptWithRawKey(plainText, rawKeyBytes) {
+  const key = await importAesKey(rawKeyBytes);
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // 12 bytes recommended for GCM
+  const enc = new TextEncoder().encode(plainText);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc);
+  return {
+    v: 1,
+    algo: "AES-GCM",
+    iv: bytesToBase64Url(iv),
+    cipher: bytesToBase64Url(new Uint8Array(ct))
+  };
+}
+async function decryptWithRawKey(blob, rawKeyBytes) {
+  const key = await importAesKey(rawKeyBytes);
+  const iv = base64UrlToBytes(blob.iv);
+  const ct = base64UrlToBytes(blob.cipher);
+  const plainBuf = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+  return new TextDecoder().decode(plainBuf);
+}
+
+/* ---------- pack/unpack JSON -> base64 string for easy copy/paste ---------- */
+function packBlobJSON(blobObj) {
+  return btoa(JSON.stringify(blobObj));
+}
+function unpackBlobJSON(packedStr) {
+  return JSON.parse(atob(packedStr));
+}
+
+/* ---------- helpers: clipboard + download + disable UI ---------- */
+async function writeClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(text);
+    return true;
   }
+  // fallback
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); } catch (e) { /* ignore */ }
+  ta.remove();
+  return false;
+}
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+function setUIEnabled(enabled) {
+  document.getElementById("encryptBtn").disabled = !enabled;
+  document.getElementById("decryptBtn").disabled = !enabled;
+  document.getElementById("genKeyBtn")?.disabled = !enabled;
+}
 
-  // Генерация ключа (base64url) и отображение в поле
-  document.getElementById("encryptBtn").addEventListener("click", async () => {
+/* ---------- UI handlers ---------- */
+function showMessage(msg, color = "blue") {
+  const el = document.getElementById("result");
+  if (!el) return;
+  el.style.display = "block";
+  el.style.color = color;
+  el.textContent = msg;
+}
+
+async function handleGenerateKey() {
+  try {
+    const keyStr = generateKeyString();
+    const keyInput = document.getElementById("key");
+    keyInput.value = keyStr;
+    showMessage("Ключ сгенерирован. Скопируйте и передайте отдельно.", "green");
+  } catch (e) {
+    console.error("gen key err", e);
+    showMessage("Ошибка генерации ключа", "red");
+  }
+}
+
+async function handleEncryptPack() {
+  setUIEnabled(false);
+  try {
     const text = document.getElementById("text").value;
+    if (!text) { showMessage("Введите текст для шифрования", "red"); setUIEnabled(true); return; }
+
     let keyStr = document.getElementById("key").value.trim();
-
-    if (!text) {
-      return showMessage("Введите текст!", "red");
-    }
-
-    // Если ключ не введён — генерируем случайный 256-битный ключ и показываем пользователю
     if (!keyStr) {
+      // generate and show to user
       keyStr = generateKeyString();
       document.getElementById("key").value = keyStr;
-      // Пользователю нужно сохранить/передать ключ по другому каналу!
-      alert("Сгенерирован ключ (скопируйте и сохраните отдельно):\n\n" + keyStr);
+      // user must copy key separately
+      alert("Сгенерирован ключ. Скопируйте и сохраните отдельно:\n\n" + keyStr);
       showMessage("Ключ сгенерирован. Сохраните его отдельно.", "green");
     }
 
-    try {
-      // raw key из base64url
-      const raw = base64UrlToBytes(keyStr);
-      const blob = await encryptWithRawKey(text, raw);
-      const packed = packBlobJSON(blob); // строка, готовая к копированию/скачиванию
+    // convert key and encrypt
+    const raw = base64UrlToBytes(keyStr);
+    const blob = await encryptWithRawKey(text, raw);
+    const packed = packBlobJSON(blob);
 
-      showMessage("✅ Упаковано успешно", "green");
+    const out = document.getElementById("linkResult");
+    out.style.display = "block";
+    // create elements programmatically (avoids quoting issues)
+    out.innerHTML = "";
+    const label = document.createElement("label");
+    label.textContent = "Пакет (скопируйте и отправьте адресату):";
+    const ta = document.createElement("textarea");
+    ta.id = "packedArea";
+    ta.rows = 6;
+    ta.style.width = "100%";
+    ta.value = packed;
+    const div = document.createElement("div");
+    div.style.marginTop = ".5rem";
+    const copyBtn = document.createElement("button");
+    copyBtn.textContent = "Скопировать пакет";
+    const dlBtn = document.createElement("button");
+    dlBtn.textContent = "Скачать пакет";
+    div.appendChild(copyBtn);
+    div.appendChild(document.createTextNode(" "));
+    div.appendChild(dlBtn);
+    out.appendChild(label);
+    out.appendChild(ta);
+    out.appendChild(div);
 
-      const out = document.getElementById("linkResult");
-      out.style.display = "block";
-      out.innerHTML = `
-        <label>Пакет (скопируйте и отправьте адресату):</label>
-        <textarea id="packedArea" rows="6" style="width:100%;">${packed}</textarea>
-        <div style="margin-top:.5rem;">
-          <button id="copyBtn">Скопировать пакет</button>
-          <button id="downloadBtn">Скачать пакет</button>
-        </div>
-      `;
+    copyBtn.addEventListener("click", async () => {
+      await writeClipboard(ta.value);
+      showMessage("Пакет скопирован в буфер обмена", "green");
+    });
+    dlBtn.addEventListener("click", () => {
+      downloadText("secret.pkg", ta.value);
+    });
 
-      document.getElementById("copyBtn").addEventListener("click", async () => {
-        await navigator.clipboard.writeText(document.getElementById("packedArea").value);
-        showMessage("Пакет скопирован в буфер обмена", "green");
-      });
+    showMessage("✅ Упаковано успешно", "green");
+  } catch (e) {
+    console.error("encrypt error", e);
+    showMessage("Ошибка при шифровании: " + (e.message || e), "red");
+  } finally {
+    setUIEnabled(true);
+  }
+}
 
-      document.getElementById("downloadBtn").addEventListener("click", () => {
-        const content = document.getElementById("packedArea").value;
-        const blobFile = new Blob([content], { type: "text/plain" });
-        const url = URL.createObjectURL(blobFile);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "secret.pkg";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-      });
-    } catch (e) {
-      console.error(e);
-      showMessage("Ошибка при шифровании: " + (e.message || e), "red");
-    }
-  });
-
-  // Дешифровка: принимает упакованный пакет + ключ в поле 'key'
-  document.getElementById("decryptBtn").addEventListener("click", async () => {
+async function handleDecrypt() {
+  setUIEnabled(false);
+  try {
     const packed = document.getElementById("text").value.trim();
     const keyStr = document.getElementById("key").value.trim();
-    if (!packed || !keyStr) return showMessage("Вставьте пакет и ключ!", "red");
+    if (!packed || !keyStr) { showMessage("Вставьте пакет и ключ!", "red"); setUIEnabled(true); return; }
 
+    let blob;
     try {
-      const blob = unpackBlobJSON(packed);
-      const raw = base64UrlToBytes(keyStr);
+      blob = unpackBlobJSON(packed);
+    } catch (err) {
+      showMessage("Неправильный формат пакета (не тот формат).", "red");
+      setUIEnabled(true);
+      return;
+    }
+
+    const raw = base64UrlToBytes(keyStr);
+    try {
       const plain = await decryptWithRawKey(blob, raw);
       showMessage("🔓 Расшифровано: " + plain, "green");
-      // опция: очищаем поле пакета (burn after open — клиентская опция)
+      // optionally clear input for burn-after-open UX:
       // document.getElementById("text").value = "";
-    } catch (e) {
-      console.error(e);
-      showMessage("Ошибка дешифровки: " + (e.message || e), "red");
+    } catch (err) {
+      showMessage("Ошибка дешифровки (неверный ключ или повреждённый пакет).", "red");
+      console.error("decrypt error", err);
     }
+
+  } finally {
+    setUIEnabled(true);
+  }
+}
+
+/* ---------- attach events after DOM ready ---------- */
+(function attach() {
+  // add optional generate key button if absent
+  if (!document.getElementById("genKeyBtn")) {
+    const container = document.createElement("div");
+    container.style.marginTop = ".5rem";
+    const gen = document.createElement("button");
+    gen.id = "genKeyBtn";
+    gen.textContent = "Сгенерировать ключ";
+    container.appendChild(gen);
+    const parent = document.querySelector("div"); // first div container in markup
+    if (parent) parent.parentNode.insertBefore(container, parent.nextSibling);
+    gen.addEventListener("click", handleGenerateKey);
+  } else {
+    document.getElementById("genKeyBtn").addEventListener("click", handleGenerateKey);
+  }
+
+  const encBtn = document.getElementById("encryptBtn");
+  const decBtn = document.getElementById("decryptBtn");
+  if (encBtn) encBtn.addEventListener("click", handleEncryptPack);
+  if (decBtn) decBtn.addEventListener("click", handleDecrypt);
+
+  // quick sanity check in console
+  console.info("Client-only crypto script attached. Functions:", {
+    generateKeyString: typeof generateKeyString,
+    encryptWithRawKey: typeof encryptWithRawKey,
+    decryptWithRawKey: typeof decryptWithRawKey
   });
+})();
 </script>
 </body>
 </html>
