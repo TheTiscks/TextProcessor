@@ -5,6 +5,43 @@
   <title>🔒 Client-only Cryptor</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+  /* Простая анимация для плавного появления результатов */
+  .result {
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+  }
+
+  .result.show {
+    opacity: 1;
+  }
+
+  button {
+    background-color: #4caf50; /* Зеленый цвет */
+    color: white;
+    border-radius: 8px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease, transform 0.3s ease;
+  }
+
+  button:hover {
+    background-color: #45a049; /* Темный зеленый при наведении */
+    transform: scale(1.05);
+  }
+
+  textarea, input {
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 1rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+
+  textarea:focus, input:focus {
+    outline: none;
+    box-shadow: 0 0 10px rgba(66, 133, 244, 0.5);
+  }
+  </style>
 </head>
 <body>
   <h2 class="center-align">🔒 Client-only Cryptor</h2>
