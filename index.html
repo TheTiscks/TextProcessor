@@ -7,17 +7,29 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-  <h2>Client-only Cryptor</h2>
+  <h2 class="center-align">🔒 Client-only Cryptor</h2>
 
-  <textarea id="text" rows="6" placeholder="Введите текст..."></textarea>
-  <input id="key" type="password" placeholder="Пароль (или оставьте пустым для генерации)"/>
-  <div>
-    <button id="encryptBtn">Шифровать и упаковать</button>
-    <button id="decryptBtn">Дешифровать пакет</button>
+  <div class="input-field">
+    <textarea id="text" class="materialize-textarea" placeholder="Введите текст..."></textarea>
+    <label for="text">Текст для шифрования</label>
   </div>
 
-  <div id="result" style="margin-top:1rem;color:blue;"></div>
-  <div id="linkResult" style="margin-top:1rem;display:none;"></div>
+  <div class="input-field">
+    <input id="key" type="text" placeholder="Пароль (или оставьте пустым для генерации)" class="validate">
+    <label for="key">Пароль</label>
+  </div>
+
+  <div class="center-align">
+    <button id="encryptBtn" class="btn waves-effect waves-light">
+      <i class="material-icons left">lock</i>Шифровать
+    </button>
+    <button id="decryptBtn" class="btn waves-effect waves-light">
+      <i class="material-icons left">lock_open</i>Дешифровать
+    </button>
+  </div>
+
+  <div id="result" class="result" style="margin-top:1rem; color: blue;"></div>
+  <div id="linkResult" class="result" style="margin-top:1rem; display:none;"></div>
 
   <script type="module">
 function bytesToBase64Url(bytes) {
