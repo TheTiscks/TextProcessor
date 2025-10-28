@@ -301,6 +301,10 @@ async function handleDecrypt() {
     encryptWithRawKey: typeof encryptWithRawKey,
     decryptWithRawKey: typeof decryptWithRawKey
   });
+
+  document.addEventListener('DOMContentLoaded', function() {
+      M.AutoInit(); // Автоматически инициализирует все компоненты
+  });
 })();
 </script>
 </body>
