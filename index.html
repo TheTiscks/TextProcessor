@@ -10,7 +10,7 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 800px;
+      max-width: 700px;
       margin: 2rem auto;
     }
 
@@ -51,7 +51,7 @@
   </style>
 </head>
 
-<body class="container" style="max-width: 700px;">
+<body class="container">
   <h3 class="center-align" style="margin-top: 40px;">
     🔒 Client-Only Cryptor
   </h3>
@@ -61,6 +61,7 @@
     <div class="card-content">
       <span class="card-title">Шифрование</span>
 
+      <!-- Удалили placeholder, используем только label -->
       <div class="input-field">
         <textarea id="text" class="materialize-textarea"></textarea>
         <label for="text">Введите текст</label>
@@ -107,7 +108,13 @@
     </div>
   </div>
 
+
   <script type="module">
+    document.addEventListener("DOMContentLoaded", function () {
+      // Обновляем текстовые поля для активации плавающих меток
+      M.updateTextFields();
+      M.AutoInit(); // Инициализация всех компонентов Materialize
+    });
 
 function bytesToBase64Url(bytes) {
   const b64 = btoa(String.fromCharCode(...bytes));
@@ -341,10 +348,6 @@ async function handleDecrypt() {
     decryptWithRawKey: typeof decryptWithRawKey
   });
 
-  document.addEventListener("DOMContentLoaded", function () {
-      M.updateTextFields();
-      M.AutoInit();
-    });
   });
 })();
 </script>
