@@ -51,76 +51,67 @@
   </style>
 </head>
 
-<body class="container">
+<body class="container" style="max-width: 700px;">
   <h3 class="center-align" style="margin-top: 40px;">
     🔒 Client-Only Cryptor
   </h3>
 
-  <div class="row">
-    <div class="col s12">
-      <ul class="tabs tabs-fixed-width">
-        <li class="tab col s6"><a class="active" href="#encryptTab">Шифрование</a></li>
-        <li class="tab col s6"><a href="#decryptTab">Дешифрование</a></li>
-      </ul>
-    </div>
+  <!-- ENCRYPT BLOCK -->
+  <div class="card" style="margin-top: 30px;">
+    <div class="card-content">
+      <span class="card-title">Шифрование</span>
 
-    <!-- Encrypt Tab -->
-    <div id="encryptTab" class="col s12">
-      <div class="card" style="margin-top: 20px;">
-        <div class="card-content">
-          <span class="card-title">Шифровать и упаковать</span>
-
-          <div class="input-field">
-            <textarea id="text" class="materialize-textarea"></textarea>
-            <label for="text">Введите текст</label>
-          </div>
-
-          <div class="input-field">
-            <input id="key" type="text">
-            <label for="key">Ключ (оставьте пустым для генерации)</label>
-          </div>
-
-          <button class="btn green waves-effect waves-light" id="encryptBtn">
-            <i class="material-icons left">lock</i>Шифровать
-          </button>
-
-          <button class="btn blue lighten-1 waves-effect waves-light" id="genKeyBtn" style="margin-left:10px;">
-            <i class="material-icons left">vpn_key</i>Сгенерировать ключ
-          </button>
-
-          <div id="result" class="card-panel" style="display:none;margin-top:20px;"></div>
-          <div id="linkResult" style="display:none;margin-top:20px;"></div>
-        </div>
+      <div class="input-field">
+        <textarea id="text" class="materialize-textarea"></textarea>
+        <label for="text">Введите текст</label>
       </div>
-    </div>
 
-    <!-- Decrypt Tab -->
-    <div id="decryptTab" class="col s12">
-      <div class="card" style="margin-top: 20px;">
-        <div class="card-content">
-          <span class="card-title">Дешифровать пакет</span>
-
-          <div class="input-field">
-            <textarea id="textDecrypt" class="materialize-textarea"></textarea>
-            <label for="textDecrypt">Вставьте пакет</label>
-          </div>
-
-          <div class="input-field">
-            <input id="keyDecrypt" type="text">
-            <label for="keyDecrypt">Ключ</label>
-          </div>
-
-          <button class="btn orange waves-effect waves-light" id="decryptBtn">
-            <i class="material-icons left">lock_open</i>Дешифровать
-          </button>
-
-          <div id="resultDecrypt" class="card-panel" style="display:none;margin-top:20px;"></div>
-        </div>
+      <div class="input-field">
+        <input id="key" type="text">
+        <label for="key">Ключ (оставьте пустым для генерации)</label>
       </div>
+
+      <button class="btn green waves-effect waves-light" id="encryptBtn">
+        <i class="material-icons left">lock</i>Шифровать
+      </button>
+
+      <button class="btn blue lighten-1 waves-effect waves-light" id="genKeyBtn" style="margin-left:10px;">
+        <i class="material-icons left">vpn_key</i>Сгенерировать ключ
+      </button>
+
+      <div id="result" class="card-panel" style="display:none; margin-top:20px;"></div>
+      <div id="linkResult" style="display:none; margin-top:20px;"></div>
+    </div>
+  </div>
+
+  <!-- DECRYPT BLOCK -->
+  <div class="card" style="margin-top: 30px; margin-bottom: 70px;">
+    <div class="card-content">
+      <span class="card-title">Дешифрование</span>
+
+      <div class="input-field">
+        <textarea id="textDecrypt" class="materialize-textarea"></textarea>
+        <label for="textDecrypt">Вставьте пакет</label>
+      </div>
+
+      <div class="input-field">
+        <input id="keyDecrypt" type="text">
+        <label for="keyDecrypt">Ключ</label>
+      </div>
+
+      <button class="btn orange waves-effect waves-light" id="decryptBtn">
+        <i class="material-icons left">lock_open</i>Дешифровать
+      </button>
+
+      <div id="resultDecrypt" class="card-panel" style="display:none; margin-top:20px;"></div>
     </div>
   </div>
 
   <script type="module">
+      document.addEventListener("DOMContentLoaded", function () {
+      M.updateTextFields();
+      M.AutoInit();
+    });
 function bytesToBase64Url(bytes) {
   const b64 = btoa(String.fromCharCode(...bytes));
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
